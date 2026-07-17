@@ -26,26 +26,26 @@ error_symbol = "[❯](bold red)"
 [directory]
 truncation_length = 3
 truncate_to_repo = true
-style = "bold cyan"
+style = "bold bright-cyan"
 
 [git_branch]
 symbol = " "
-style = "bold purple"
+style = "bold bright-purple"
 format = "[$symbol$branch]($style) "
 
 [git_status]
-style = "bold yellow"
+style = "bold bright-yellow"
 format = "([$all_status$ahead_behind]($style)) "
 
 [golang]
 symbol = " "
-style = "bold cyan"
+style = "bold bright-cyan"
 format = "[$symbol($version )]($style)"
 
 [kubernetes]
 disabled = false
 symbol = "☸ "
-style = "bold blue"
+style = "bold bright-blue"
 format = "[$symbol$context( \\($namespace\\))]($style) "
 
 [cmd_duration]
@@ -55,8 +55,12 @@ format = "took [$duration]($style)"
 
 # Active AI assistant indicator (mirrors the routing in ~/.zsh/ai.zsh).
 # Two variants so the style can differ; only one is ever non-empty:
-#   - custom.ai_manual: $AI_ASSISTANT session override set -> bold yellow
-#   - custom.ai_auto:   no override, cwd-computed default    -> dim
+#   - custom.ai_manual: $AI_ASSISTANT session override set -> bold bright-yellow
+#   - custom.ai_auto:   no override, cwd-computed default    -> plain (non-bold,
+#     non-dim) yellow — same hue as the override so it still reads as "AI
+#     assistant", but the missing bold is what marks it as the secondary/auto
+#     state. `dimmed` was dropped: on a translucent terminal background it
+#     washed out to near-invisible, which defeated the point of showing it.
 # Both commands are pure shell builtins (case/printf), no external process spawns.
 
 [custom.ai_manual]
@@ -64,7 +68,7 @@ command = 'printf "%s" "$AI_ASSISTANT"'
 when = '[ -n "$AI_ASSISTANT" ]'
 shell = ["sh", "--norc"]
 format = "[🤖 $output]($style) "
-style = "bold yellow"
+style = "bold bright-yellow"
 disabled = false
 
 [custom.ai_auto]
@@ -77,13 +81,13 @@ esac
 when = '[ -z "$AI_ASSISTANT" ]'
 shell = ["sh", "--norc"]
 format = "[🤖 $output]($style) "
-style = "dimmed"
+style = "yellow"
 disabled = false
 
 # Active mise project-config indicator: prints the basename of the nearest
 # ancestor directory (walking up from $PWD toward $HOME) that has its own
 # mise.toml / .mise.toml / .tool-versions, e.g. "ExampleOrg" when under
-# ~/go/src/github.com/ExampleOrg/mise.toml. Green when found. Prints
+# ~/go/src/github.com/ExampleOrg/mise.toml. Bold bright-green when found. Prints
 # nothing when no project config exists anywhere up to $HOME — chosen over
 # a dim "mise" fallback for cleanliness (most dirs have no project config,
 # and a fallback label would be noise most of the time). Icon: ⚙ (distinct
@@ -120,6 +124,6 @@ done
 '''
 shell = ["sh", "--norc"]
 format = "[⚙ $output]($style) "
-style = "bold green"
+style = "bold bright-green"
 disabled = false
 

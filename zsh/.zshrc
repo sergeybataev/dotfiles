@@ -1,7 +1,62 @@
+# --- startup timer: stamp as early as possible ---
+zmodload zsh/datetime
+zmodload zsh/stat
+typeset -F __zshrc_start=$EPOCHREALTIME
+
+# __zshrc_stale <file> <max_age_hours> — true (0) if <file> is missing or its
+# mtime is older than <max_age_hours>. Used to gate the once-a-day compinit
+# rebuild and the kubectl-completion cache below. Deliberately NOT using
+# zsh glob qualifiers like (#qN.mh+24) here — that syntax silently requires
+# `setopt extendedglob` (unset in this file), so it was quietly always
+# matching "stale" regardless of actual file age. zstat's mtime is exact
+# and doesn't depend on glob options.
+__zshrc_stale() {
+  local f="$1" max_hours="$2" mtime
+  [[ -f "$f" ]] || return 0
+  mtime=$(zstat +mtime "$f" 2>/dev/null) || return 0
+  (( EPOCHSECONDS - mtime > max_hours * 3600 ))
+}
+
+# __zshrc_source_cached <cache-file> <binary-path-or-empty> <generate-cmd...>
+# Regenerates <cache-file> by running <generate-cmd> when: the cache is
+# missing/empty, <binary-path> is newer than the cache (binary was
+# upgraded), or the cache is >24h old — then sources the cache file. Used
+# for `eval "$(X init zsh)"`-style one-time shell-function bootstraps that
+# measured >15ms (mise activate, starship init, atuin init): their output is
+# a deterministic function of the tool's version, so caching is safe as
+# long as it's invalidated on binary upgrade, which the mtime check does.
+__zshrc_source_cached() {
+  local cache="$1" bin="$2"
+  shift 2
+  if [[ ! -s "$cache" ]] || { [[ -n "$bin" ]] && [[ "$bin" -nt "$cache" ]] } || __zshrc_stale "$cache" 24; then
+    mkdir -p "${cache:h}"
+    "$@" >| "$cache" 2>/dev/null
+  fi
+  [[ -s "$cache" ]] && source "$cache"
+}
+
+# --- per-section debug timers, gated by ZSHRC_DEBUG=1 (see README) ---
+# Zero overhead when unset: every call site is guarded by a cheap
+# [[ -n $ZSHRC_DEBUG ]] before __zshrc_mark is even invoked, and
+# __zshrc_mark itself re-checks and bails immediately.
+if [[ -n "$ZSHRC_DEBUG" ]]; then
+  typeset -F __zshrc_last=$__zshrc_start
+  typeset -a __zshrc_mark_order
+  typeset -A __zshrc_marks
+fi
+__zshrc_mark() {
+  [[ -n "$ZSHRC_DEBUG" ]] || return
+  local now=$EPOCHREALTIME
+  __zshrc_marks[$1]=$(( (now - __zshrc_last) * 1000 ))
+  __zshrc_mark_order+=("$1")
+  __zshrc_last=$now
+}
+
 if [[ -f /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh ]]; then
   . /nix/var/nix/profiles/default/etc/profile.d/nix-daemon.sh
   . /nix/var/nix/profiles/default/etc/profile.d/nix.sh
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark nix
 
 export LANG="en_US.UTF-8"
 export LC_ALL="en_US.UTF-8"
@@ -127,11 +182,16 @@ if [[ -d "$HOME/.lmstudio/bin" ]]; then
 fi
 # End of LM Studio CLI section
 
-# mise (tool version manager) activation
-eval "$(mise activate zsh)"
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "PATH/exports"
+
+# mise (tool version manager) activation — cached (>15ms measured cost),
+# regenerated when the mise binary is upgraded or the cache is >24h old.
+__zshrc_source_cached "$HOME/.zsh/cache/mise_activate.zsh" "$commands[mise]" mise activate zsh
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "mise activate"
 
 # direnv hook (only if installed)
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "direnv hook"
 
 typeset -U path cdpath fpath manpath
 cdpath+=(~/.local/share/src)
@@ -152,16 +212,33 @@ fi
 # check + re-parse) the rest of the time. Standard zsh perf pattern.
 autoload -Uz compinit
 _zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
-if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+if __zshrc_stale "$_zcompdump" 24; then
+  [[ -n "$ZSHRC_DEBUG" ]] && echo "compinit: full rebuild (dump older than 24h or missing) — this is the likely source of the occasional slow-startup outlier"
   compinit -d "$_zcompdump"
 else
   compinit -C -d "$_zcompdump"
 fi
 unset _zcompdump
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark compinit
 
-# kubectl completion (guarded — only if kubectl is on PATH)
-(( $+commands[kubectl] )) && source <(kubectl completion zsh)
+# kubectl completion — cached to disk, regenerated when the kubectl binary
+# is newer than the cache (or the cache is missing/>24h old). Sourcing the
+# cached file is a plain `source`, not a `kubectl` fork, on every other
+# startup — `kubectl completion zsh` forking kubectl on every shell was the
+# single biggest measured startup regression before this fix.
+if (( $+commands[kubectl] )); then
+  _kubectl_cache_dir="$HOME/.zsh/cache"
+  _kubectl_cache="$_kubectl_cache_dir/kubectl_completion.zsh"
+  _kubectl_bin="$commands[kubectl]"
+  if [[ ! -f "$_kubectl_cache" || "$_kubectl_bin" -nt "$_kubectl_cache" ]] || __zshrc_stale "$_kubectl_cache" 24; then
+    mkdir -p "$_kubectl_cache_dir"
+    kubectl completion zsh >| "$_kubectl_cache" 2>/dev/null
+  fi
+  [[ -s "$_kubectl_cache" ]] && source "$_kubectl_cache"
+  unset _kubectl_cache_dir _kubectl_cache _kubectl_bin
+fi
 compdef k=kubectl
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "kubectl completion"
 
 # fzf-tab — replaces the default tab-completion menu with an fzf picker.
 # Must load AFTER compinit and BEFORE autosuggestions/syntax-highlighting
@@ -169,9 +246,11 @@ compdef k=kubectl
 if [[ -f "$HOME/.zsh/plugins/fzf-tab/fzf-tab.plugin.zsh" ]]; then
   source "$HOME/.zsh/plugins/fzf-tab/fzf-tab.plugin.zsh"
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark fzf-tab
 
 # ai.zsh — opt-in AI helpers with per-cwd assistant routing
 [[ -f ~/.zsh/ai.zsh ]] && source ~/.zsh/ai.zsh
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark ai.zsh
 
 # zsh-autosuggestions
 if [[ -f "$HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
@@ -186,12 +265,14 @@ if [[ -f "$HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; th
   bindkey '^[f'     forward-word
   bindkey '^[[1;5C' forward-word
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark autosuggestions
 
 # fast-syntax-highlighting — must load LAST among the highlighting/completion
 # plugins (after autosuggestions), per upstream docs.
 if [[ -f "$HOME/.zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" ]]; then
   source "$HOME/.zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark fast-syntax-highlighting
 
 # zsh-history-substring-search — load (and bind) after fast-syntax-highlighting,
 # since its bindings should come after highlighting is wired up.
@@ -202,25 +283,31 @@ if [[ -f "$HOME/.zsh/plugins/zsh-history-substring-search/zsh-history-substring-
   [[ -n "${terminfo[kcuu1]}" ]] && bindkey "${terminfo[kcuu1]}" history-substring-search-up
   [[ -n "${terminfo[kcud1]}" ]] && bindkey "${terminfo[kcud1]}" history-substring-search-down
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark substring-search
 
 # fzf shell integration (completion + Ctrl-T/Alt-C widgets only —
 # atuin takes ownership of Ctrl-R since it's initialized after this)
 if (( $+commands[fzf] )); then
   source <(fzf --zsh)
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark fzf
 
-# atuin — Ctrl-R fuzzy history search; keep the default up-arrow prefix search
+# atuin — Ctrl-R fuzzy history search; keep the default up-arrow prefix
+# search. Cached (>15ms measured cost), same invalidation as mise above.
 if (( $+commands[atuin] )); then
-  eval "$(atuin init zsh --disable-up-arrow)"
+  __zshrc_source_cached "$HOME/.zsh/cache/atuin_init.zsh" "$commands[atuin]" atuin init zsh --disable-up-arrow
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark atuin
 
 # zoxide
 if (( $+commands[zoxide] )); then
   eval "$(zoxide init zsh)"
 fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark zoxide
 
-# starship prompt
-eval "$(starship init zsh)"
+# starship prompt. Cached (>15ms measured cost), same invalidation as mise above.
+__zshrc_source_cached "$HOME/.zsh/cache/starship_init.zsh" "$commands[starship]" starship init zsh
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark starship
 
 # History options should be set in .zshrc and after oh-my-zsh sourcing.
 # See https://github.com/nix-community/home-manager/issues/177.
@@ -250,6 +337,7 @@ for opt in "${disabled_opts[@]}"; do
   unsetopt "$opt"
 done
 unset opt disabled_opts
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "history opts"
 
 # pip 3 binaries (adjust python version to match yours)
 # export PATH="$HOME/Library/Python/3.14/bin:$PATH"
@@ -274,3 +362,27 @@ unset opt disabled_opts
 #   }
 # fi
 # unset _GCLOUD_COMPLETION_INC
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark gcloud
+
+# --- startup timer: report elapsed time at the first prompt, then remove itself ---
+__zshrc_report_startup() {
+  local -F elapsed=$(( EPOCHREALTIME - __zshrc_start ))
+  printf '⚡ zsh ready in %.0f ms\n' $(( elapsed * 1000 ))
+
+  if [[ -n "$ZSHRC_DEBUG" ]]; then
+    echo "--- ZSHRC_DEBUG: per-section timings (sorted, slowest first) ---"
+    local name
+    for name in "${__zshrc_mark_order[@]}"; do
+      printf '%7.1f ms  %s\n' "${__zshrc_marks[$name]}" "$name"
+    done | sort -rn
+    echo "-----------------------------------------------------------------"
+  fi
+
+  # one-shot: unhook and clean up
+  add-zsh-hook -d precmd __zshrc_report_startup
+  unfunction __zshrc_report_startup
+  unset __zshrc_start __zshrc_last __zshrc_mark_order __zshrc_marks
+  unfunction __zshrc_mark
+}
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd __zshrc_report_startup
