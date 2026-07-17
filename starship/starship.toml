@@ -9,6 +9,12 @@ $kubernetes\
 $custom
 $character"""
 
+# Shared walk-up logic used by both custom.mise.when and custom.mise.command:
+# starting at $PWD, climb toward $HOME/"/" looking for a project-level mise
+# config (mise.toml / .mise.toml / .tool-versions). Pure POSIX parameter
+# expansion (no dirname/basename forks, no `mise` invocation — too slow to
+# run on every prompt).
+
 right_format = """$cmd_duration"""
 
 add_newline = true
@@ -72,5 +78,48 @@ when = '[ -z "$AI_ASSISTANT" ]'
 shell = ["sh", "--norc"]
 format = "[🤖 $output]($style) "
 style = "dimmed"
+disabled = false
+
+# Active mise project-config indicator: prints the basename of the nearest
+# ancestor directory (walking up from $PWD toward $HOME) that has its own
+# mise.toml / .mise.toml / .tool-versions, e.g. "ExampleOrg" when under
+# ~/go/src/github.com/ExampleOrg/mise.toml. Green when found. Prints
+# nothing when no project config exists anywhere up to $HOME — chosen over
+# a dim "mise" fallback for cleanliness (most dirs have no project config,
+# and a fallback label would be noise most of the time). Icon: ⚙ (distinct
+# from ☸ kubernetes and 🤖 ai). `when` runs the identical walk and exits
+# non-zero immediately if nothing is found, so the module is skipped
+# without ever rendering an empty segment.
+[custom.mise]
+when = '''
+dir="$PWD"
+while true; do
+  if [ -f "$dir/mise.toml" ] || [ -f "$dir/.mise.toml" ] || [ -f "$dir/.tool-versions" ]; then
+    exit 0
+  fi
+  if [ "$dir" = "$HOME" ] || [ "$dir" = "/" ]; then
+    exit 1
+  fi
+  dir="${dir%/*}"
+  [ -z "$dir" ] && dir="/"
+done
+'''
+command = '''
+dir="$PWD"
+while true; do
+  if [ -f "$dir/mise.toml" ] || [ -f "$dir/.mise.toml" ] || [ -f "$dir/.tool-versions" ]; then
+    printf "%s" "${dir##*/}"
+    exit 0
+  fi
+  if [ "$dir" = "$HOME" ] || [ "$dir" = "/" ]; then
+    exit 1
+  fi
+  dir="${dir%/*}"
+  [ -z "$dir" ] && dir="/"
+done
+'''
+shell = ["sh", "--norc"]
+format = "[⚙ $output]($style) "
+style = "bold green"
 disabled = false
 

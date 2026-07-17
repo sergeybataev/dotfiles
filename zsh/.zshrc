@@ -148,11 +148,27 @@ elif [[ -d "/usr/share/zsh/$ZSH_VERSION/help" ]]; then
   HELPDIR="/usr/share/zsh/$ZSH_VERSION/help"
 fi
 
-autoload -U compinit && compinit
+# compinit — full rebuild at most once/day, cached (-C, skip the security
+# check + re-parse) the rest of the time. Standard zsh perf pattern.
+autoload -Uz compinit
+_zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
+if [[ -n "$_zcompdump"(#qN.mh+24) ]]; then
+  compinit -d "$_zcompdump"
+else
+  compinit -C -d "$_zcompdump"
+fi
+unset _zcompdump
 
 # kubectl completion (guarded — only if kubectl is on PATH)
 (( $+commands[kubectl] )) && source <(kubectl completion zsh)
 compdef k=kubectl
+
+# fzf-tab — replaces the default tab-completion menu with an fzf picker.
+# Must load AFTER compinit and BEFORE autosuggestions/syntax-highlighting
+# per its README.
+if [[ -f "$HOME/.zsh/plugins/fzf-tab/fzf-tab.plugin.zsh" ]]; then
+  source "$HOME/.zsh/plugins/fzf-tab/fzf-tab.plugin.zsh"
+fi
 
 # ai.zsh — opt-in AI helpers with per-cwd assistant routing
 [[ -f ~/.zsh/ai.zsh ]] && source ~/.zsh/ai.zsh
@@ -169,6 +185,22 @@ if [[ -f "$HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; th
   # Alt-F and Ctrl-RightArrow: accept one word (via forward-word partial-accept)
   bindkey '^[f'     forward-word
   bindkey '^[[1;5C' forward-word
+fi
+
+# fast-syntax-highlighting — must load LAST among the highlighting/completion
+# plugins (after autosuggestions), per upstream docs.
+if [[ -f "$HOME/.zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh" ]]; then
+  source "$HOME/.zsh/plugins/fast-syntax-highlighting/fast-syntax-highlighting.plugin.zsh"
+fi
+
+# zsh-history-substring-search — load (and bind) after fast-syntax-highlighting,
+# since its bindings should come after highlighting is wired up.
+if [[ -f "$HOME/.zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh" ]]; then
+  source "$HOME/.zsh/plugins/zsh-history-substring-search/zsh-history-substring-search.zsh"
+  bindkey '^[[A' history-substring-search-up
+  bindkey '^[[B' history-substring-search-down
+  [[ -n "${terminfo[kcuu1]}" ]] && bindkey "${terminfo[kcuu1]}" history-substring-search-up
+  [[ -n "${terminfo[kcud1]}" ]] && bindkey "${terminfo[kcud1]}" history-substring-search-down
 fi
 
 # fzf shell integration (completion + Ctrl-T/Alt-C widgets only —
@@ -229,5 +261,16 @@ unset opt disabled_opts
 
 # Google Cloud SDK — only if installed at this path (adjust to your own location).
 # if [ -f "$HOME/path/to/google-cloud-sdk/path.zsh.inc" ]; then . "$HOME/path/to/google-cloud-sdk/path.zsh.inc"; fi
-# if [ -f "$HOME/path/to/google-cloud-sdk/completion.zsh.inc" ]; then . "$HOME/path/to/google-cloud-sdk/completion.zsh.inc"; fi
 # export GOOGLE_CLOUD_PROJECT="your-project-id"
+#
+# gcloud completion — lazy-loaded, since completion.zsh.inc is slow to source
+# and most shells never call gcloud. Defer it to first invocation:
+# _GCLOUD_COMPLETION_INC="$HOME/path/to/google-cloud-sdk/completion.zsh.inc"
+# if [[ -f "$_GCLOUD_COMPLETION_INC" ]]; then
+#   gcloud() {
+#     unfunction gcloud
+#     source "$_GCLOUD_COMPLETION_INC"
+#     gcloud "$@"
+#   }
+# fi
+# unset _GCLOUD_COMPLETION_INC

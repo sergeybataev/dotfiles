@@ -5,7 +5,8 @@
 # What it does:
 #   1. Installs mise (tool version manager) if missing.
 #   2. Installs the tools pinned in mise/config.toml (`mise use -g`).
-#   3. Clones zsh-autosuggestions into ~/.zsh/plugins/.
+#   3. Clones zsh-autosuggestions, fzf-tab, fast-syntax-highlighting, and
+#      zsh-history-substring-search into ~/.zsh/plugins/.
 #   4. Symlinks (or copies, with a timestamped backup of anything already
 #      there) zshrc / starship.toml / ai.zsh into place.
 #
@@ -65,16 +66,25 @@ cp -n "$DOTFILES_DIR/mise/config.toml" ~/.config/mise/config.toml 2>/dev/null ||
 (cd ~/.config/mise && mise install)
 mise use -g -y 2>/dev/null || true
 
-# --- 3. zsh-autosuggestions --------------------------------------------------
+# --- 3. zsh plugins ---------------------------------------------------------
 
-PLUGIN_DIR="$HOME/.zsh/plugins/zsh-autosuggestions"
-if [ -d "$PLUGIN_DIR" ]; then
-  log "zsh-autosuggestions already present at $PLUGIN_DIR"
-else
-  log "cloning zsh-autosuggestions"
-  mkdir -p "$HOME/.zsh/plugins"
-  git clone --depth 1 https://github.com/zsh-users/zsh-autosuggestions "$PLUGIN_DIR"
-fi
+clone_plugin() {
+  # clone_plugin <name> <repo-url>
+  local name="$1" url="$2"
+  local dir="$HOME/.zsh/plugins/$name"
+  if [ -d "$dir" ]; then
+    log "$name already present at $dir"
+  else
+    log "cloning $name"
+    mkdir -p "$HOME/.zsh/plugins"
+    git clone --depth 1 "$url" "$dir"
+  fi
+}
+
+clone_plugin zsh-autosuggestions          https://github.com/zsh-users/zsh-autosuggestions
+clone_plugin fzf-tab                      https://github.com/Aloxaf/fzf-tab
+clone_plugin fast-syntax-highlighting     https://github.com/zdharma-continuum/fast-syntax-highlighting
+clone_plugin zsh-history-substring-search https://github.com/zsh-users/zsh-history-substring-search
 
 # --- 4. symlink dotfiles into place -----------------------------------------
 

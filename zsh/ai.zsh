@@ -20,14 +20,34 @@ _ai_available_assistants() {
   done
 }
 
+# _ai_in_workdir: true (0) if $PWD is under a work directory
+# (~/go/src/github.com/ExampleOrg or any path containing /ExampleOrg/).
+_ai_in_workdir() {
+  [[ "$PWD" == */ExampleOrg/* ]]
+}
+
 # _ai_assistant: echo the name of the currently-active assistant.
-#   1. $AI_ASSISTANT session override, if set and available.
+#   1. $AI_ASSISTANT session override, if set, available, and not blocked by
+#      the work-dir guard below.
 #   2. cwd under ~/go/src/github.com/ExampleOrg (or any path containing
-#      /ExampleOrg/) -> claude (work dirs must use claude only).
+#      /ExampleOrg/) -> claude (work dirs must use claude only — HARD guard,
+#      codex/agy are refused even if explicitly selected via $AI_ASSISTANT).
 #   3. otherwise -> codex (personal default), falling back to whatever exists.
 _ai_assistant() {
   local available="$(_ai_available_assistants)"
   [[ -z "$available" ]] && { echo "none"; return 1; }
+
+  if _ai_in_workdir; then
+    if [[ -n "$AI_ASSISTANT" && "$AI_ASSISTANT" != "claude" ]]; then
+      echo "work directory: claude only (refusing $AI_ASSISTANT)" >&2
+    fi
+    if [[ "$available" == *"claude "* ]]; then
+      echo "claude"
+      return 0
+    fi
+    echo "none"
+    return 1
+  fi
 
   if [[ -n "$AI_ASSISTANT" ]]; then
     if [[ "$available" == *"$AI_ASSISTANT "* ]]; then
@@ -35,15 +55,6 @@ _ai_assistant() {
       return 0
     fi
     # override set but binary missing — fall through to cwd default
-  fi
-
-  if [[ "$PWD" == */ExampleOrg/* ]]; then
-    if [[ "$available" == *"claude "* ]]; then
-      echo "claude"
-      return 0
-    fi
-    echo "none"
-    return 1
   fi
 
   if [[ "$available" == *"codex "* ]]; then
@@ -64,6 +75,10 @@ _ai_assistant() {
 
 ai-switch() {
   local order=(auto claude codex agy)
+  if _ai_in_workdir; then
+    # work directories only ever use claude — don't offer codex/agy in the cycle
+    order=(auto claude)
+  fi
   local cur="${AI_ASSISTANT:-auto}"
   local i next
   for (( i = 1; i <= ${#order[@]}; i++ )); do

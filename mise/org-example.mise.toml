@@ -1,0 +1,14 @@
+# Example of a project/org-scoped mise config — env vars and tool pins that
+# only apply when you're cd'd into that directory tree (or below it). mise
+# discovers these by walking up from $PWD, same idea as .tool-versions.
+#
+# For work-private orgs, this is a good place for things like GOPRIVATE
+# instead of putting them in your tracked, public ~/.zshrc — see
+# zsh/work.zsh.example for the equivalent shell-level pattern.
+#
+# Usage: drop a mise.toml like this at the root of the directory tree you
+# want it scoped to (e.g. ~/go/src/github.com/<your-org>/mise.toml), then
+# run `mise trust` once from inside that directory.
+
+[env]
+GOPRIVATE = "github.com/your-org"
