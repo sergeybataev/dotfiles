@@ -31,7 +31,7 @@ Work-only settings (e.g. `GOPRIVATE`) are kept out of the tracked `.zshrc` — s
 
 - `ai <question>` — one-shot prompt to the active assistant.
 - `aix <task>` — same, but asks for a shell command only (prints it, doesn't run it).
-- `wtf` — explains why the last command failed.
+- `wtf` — explains why the last command failed. Includes actual output when it can: if run inside tmux, the last ~50 lines of the pane's scrollback are attached (labeled as possibly containing unrelated lines); otherwise it prints a tip to use `wtf -r`. `wtf -r` re-runs the last command with stdout+stderr captured to a temp file and includes that output — it warns first and requires an explicit `y` confirmation (default No), since re-running a destructive command is exactly the kind of thing you don't want to do by accident.
 - Routing: `$AI_ASSISTANT` override > `claude` under any `*/ExampleOrg/*` path (or your own org, edit to taste) > `codex` elsewhere. Falls back to whatever's actually installed.
 - **Strict work-dir guard**: under a work path, `codex`/`agy` are refused outright (even via an explicit `$AI_ASSISTANT` override) and `claude` is used instead, with a one-line refusal printed to stderr. `Ctrl-X a` also drops `codex`/`agy` from the cycle while inside a work directory.
 - The starship prompt shows the active assistant (yellow = manual override, dim = auto).

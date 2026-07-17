@@ -177,14 +177,51 @@ autoload -Uz add-zsh-hook
 add-zsh-hook precmd _ai_precmd_capture_status
 
 wtf() {
+  local rerun=0
+  if [[ "$1" == "-r" ]]; then
+    rerun=1
+    shift
+  fi
+
   if [[ "$_ai_last_status" -eq 0 ]]; then
     echo "wtf: last command exited 0 (no failure to explain)" >&2
     return 1
   fi
+
   local last_cmd
   last_cmd="$(fc -ln -1)"
-  local assistant="$(_ai_assistant)"
+  local assistant
+  assistant="$(_ai_assistant)"
   local prompt="This shell command exited with status $_ai_last_status: \`$last_cmd\`. Why did it fail, and how do I fix it?"
+  local output_block=""
+
+  if [[ "$rerun" -eq 1 ]]; then
+    echo "wtf -r: this will RE-RUN the last command:" >&2
+    echo "  $last_cmd" >&2
+    local reply
+    read -r "reply?Re-execute it now to capture output? [y/N] "
+    if [[ "$reply" != [yY] && "$reply" != [yY][eE][sS] ]]; then
+      echo "wtf: aborted, not re-running." >&2
+      return 1
+    fi
+    local tmpfile
+    tmpfile="$(mktemp "${TMPDIR:-/tmp}/wtf-rerun.XXXXXX")"
+    eval "$last_cmd" >"$tmpfile" 2>&1
+    local rerun_status=$?
+    output_block=$'\n\nre-run output (exit status '"$rerun_status"$'):\n'"$(cat "$tmpfile")"
+    rm -f "$tmpfile"
+  elif [[ -n "$TMUX" ]]; then
+    local pane_output
+    pane_output="$(tmux capture-pane -p -S -50 2>/dev/null)"
+    if [[ -n "$pane_output" ]]; then
+      output_block=$'\n\nterminal output (may include unrelated lines):\n'"$pane_output"
+    fi
+  else
+    echo "tip: run inside tmux or use wtf -r to include output" >&2
+  fi
+
+  prompt="${prompt}${output_block}"
+
   case "$assistant" in
     claude)
       claude -p "$prompt"
