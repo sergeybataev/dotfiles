@@ -92,6 +92,7 @@ mkdir -p ~/.config ~/.zsh
 
 backup_and_link "$DOTFILES_DIR/zsh/.zshrc"        "$HOME/.zshrc"
 backup_and_link "$DOTFILES_DIR/zsh/ai.zsh"        "$HOME/.zsh/ai.zsh"
+backup_and_link "$DOTFILES_DIR/zsh/zhelp.zsh"     "$HOME/.zsh/zhelp.zsh"
 backup_and_link "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
 
 log "done. Start a new shell (or 'exec zsh') to pick everything up."

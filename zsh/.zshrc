@@ -18,19 +18,37 @@ __zshrc_stale() {
 }
 
 # __zshrc_source_cached <cache-file> <binary-path-or-empty> <generate-cmd...>
-# Regenerates <cache-file> by running <generate-cmd> when: the cache is
-# missing/empty, <binary-path> is newer than the cache (binary was
-# upgraded), or the cache is >24h old — then sources the cache file. Used
-# for `eval "$(X init zsh)"`-style one-time shell-function bootstraps that
-# measured >15ms (mise activate, starship init, atuin init): their output is
-# a deterministic function of the tool's version, so caching is safe as
-# long as it's invalidated on binary upgrade, which the mtime check does.
+# Stale-while-revalidate caching for `eval "$(X init zsh)"`-style one-time
+# shell-function bootstraps that measured >15ms (mise activate, starship
+# init, atuin init, kubectl completion): their output is a deterministic
+# function of the tool's version, so caching is safe as long as it's
+# invalidated on binary upgrade.
+#
+#   - cache missing/empty:        generate INLINE (first run — nothing to
+#                                  fall back to), then source.
+#   - <binary> newer than cache:  generate INLINE (binary upgrade is rare
+#                                  and correctness matters more than a few
+#                                  ms here), then source.
+#   - cache exists but >24h old:  source the EXISTING (stale) cache
+#                                  immediately for a fast prompt, then
+#                                  regenerate in a fully silent, disowned
+#                                  background job — atomic tmp-file + mv so
+#                                  concurrent shells never see a half-written
+#                                  cache, `&!` so no job-control output ever
+#                                  reaches this shell's prompt.
+#   - cache exists and fresh:     just source it.
 __zshrc_source_cached() {
   local cache="$1" bin="$2"
   shift 2
-  if [[ ! -s "$cache" ]] || { [[ -n "$bin" ]] && [[ "$bin" -nt "$cache" ]] } || __zshrc_stale "$cache" 24; then
+  if [[ ! -s "$cache" ]]; then
     mkdir -p "${cache:h}"
     "$@" >| "$cache" 2>/dev/null
+  elif [[ -n "$bin" ]] && [[ "$bin" -nt "$cache" ]]; then
+    mkdir -p "${cache:h}"
+    "$@" >| "$cache" 2>/dev/null
+  elif __zshrc_stale "$cache" 24; then
+    [[ -n "$ZSHRC_DEBUG" ]] && print -u2 "(${cache:t}: refreshing in background)"
+    ( "$@" >| "${cache}.tmp.$$" 2>/dev/null && mv -f "${cache}.tmp.$$" "$cache" ) &>/dev/null &!
   fi
   [[ -s "$cache" ]] && source "$cache"
 }
@@ -208,37 +226,38 @@ elif [[ -d "/usr/share/zsh/$ZSH_VERSION/help" ]]; then
   HELPDIR="/usr/share/zsh/$ZSH_VERSION/help"
 fi
 
-# compinit — full rebuild at most once/day, cached (-C, skip the security
-# check + re-parse) the rest of the time. Standard zsh perf pattern.
+# compinit — stale-while-revalidate, same idea as __zshrc_source_cached:
+#   - dump missing (true first run): full rebuild INLINE — nothing to fall
+#     back to, so this is the one case that has to block. Announce it
+#     unconditionally (not just under ZSHRC_DEBUG) since it's the only
+#     inline-slow path left and worth explaining if seen.
+#   - dump exists (even if >24h stale): always take the fast `-C` path
+#     inline (skip the security check + re-parse) so this shell's startup
+#     is never blocked by a dump rebuild.
+#   - dump exists but >24h old: after the fast `-C` load above, kick off a
+#     full rebuild in a silent, disowned background `zsh -c` so *future*
+#     shells get a fresh dump — this shell already started with `-C`.
 autoload -Uz compinit
 _zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
-if __zshrc_stale "$_zcompdump" 24; then
-  # Always announce (not just under ZSHRC_DEBUG): the full rebuild is the
-  # likely source of the occasional slow-startup outlier, so print a one-line
-  # explanation whenever it happens to make those outliers self-explaining.
+if [[ ! -s "$_zcompdump" ]]; then
   print -u2 "(rebuilding completion cache — first shell of the day is slower)"
   compinit -d "$_zcompdump"
 else
   compinit -C -d "$_zcompdump"
+  if __zshrc_stale "$_zcompdump" 24; then
+    [[ -n "$ZSHRC_DEBUG" ]] && print -u2 "(completion dump refreshing in background)"
+    ( zsh -c "autoload -Uz compinit; compinit -d '$_zcompdump'" ) &>/dev/null &!
+  fi
 fi
 unset _zcompdump
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark compinit
 
-# kubectl completion — cached to disk, regenerated when the kubectl binary
-# is newer than the cache (or the cache is missing/>24h old). Sourcing the
-# cached file is a plain `source`, not a `kubectl` fork, on every other
-# startup — `kubectl completion zsh` forking kubectl on every shell was the
-# single biggest measured startup regression before this fix.
+# kubectl completion — cached to disk via the same stale-while-revalidate
+# helper as mise/atuin/starship below. `kubectl completion zsh` forking
+# kubectl on every shell was one of the biggest measured startup
+# regressions before this cache existed.
 if (( $+commands[kubectl] )); then
-  _kubectl_cache_dir="$HOME/.zsh/cache"
-  _kubectl_cache="$_kubectl_cache_dir/kubectl_completion.zsh"
-  _kubectl_bin="$commands[kubectl]"
-  if [[ ! -f "$_kubectl_cache" || "$_kubectl_bin" -nt "$_kubectl_cache" ]] || __zshrc_stale "$_kubectl_cache" 24; then
-    mkdir -p "$_kubectl_cache_dir"
-    kubectl completion zsh >| "$_kubectl_cache" 2>/dev/null
-  fi
-  [[ -s "$_kubectl_cache" ]] && source "$_kubectl_cache"
-  unset _kubectl_cache_dir _kubectl_cache _kubectl_bin
+  __zshrc_source_cached "$HOME/.zsh/cache/kubectl_completion.zsh" "$commands[kubectl]" kubectl completion zsh
 fi
 compdef k=kubectl
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "kubectl completion"
@@ -254,6 +273,10 @@ fi
 # ai.zsh — opt-in AI helpers with per-cwd assistant routing
 [[ -f ~/.zsh/ai.zsh ]] && source ~/.zsh/ai.zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark ai.zsh
+
+# zhelp.zsh — `zhelp`/`zh` cheat-sheet command for this setup
+[[ -f ~/.zsh/zhelp.zsh ]] && source ~/.zsh/zhelp.zsh
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark zhelp
 
 # zsh-autosuggestions
 if [[ -f "$HOME/.zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh" ]]; then
