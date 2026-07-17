@@ -1,0 +1,76 @@
+"$schema" = 'https://starship.rs/config-schema.json'
+
+format = """
+$directory\
+$git_branch\
+$git_status\
+$golang\
+$kubernetes\
+$custom
+$character"""
+
+right_format = """$cmd_duration"""
+
+add_newline = true
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[directory]
+truncation_length = 3
+truncate_to_repo = true
+style = "bold cyan"
+
+[git_branch]
+symbol = " "
+style = "bold purple"
+format = "[$symbol$branch]($style) "
+
+[git_status]
+style = "bold yellow"
+format = "([$all_status$ahead_behind]($style)) "
+
+[golang]
+symbol = " "
+style = "bold cyan"
+format = "[$symbol($version )]($style)"
+
+[kubernetes]
+disabled = false
+symbol = "☸ "
+style = "bold blue"
+format = "[$symbol$context( \\($namespace\\))]($style) "
+
+[cmd_duration]
+min_time = 500
+style = "bold yellow"
+format = "took [$duration]($style)"
+
+# Active AI assistant indicator (mirrors the routing in ~/.zsh/ai.zsh).
+# Two variants so the style can differ; only one is ever non-empty:
+#   - custom.ai_manual: $AI_ASSISTANT session override set -> bold yellow
+#   - custom.ai_auto:   no override, cwd-computed default    -> dim
+# Both commands are pure shell builtins (case/printf), no external process spawns.
+
+[custom.ai_manual]
+command = 'printf "%s" "$AI_ASSISTANT"'
+when = '[ -n "$AI_ASSISTANT" ]'
+shell = ["sh", "--norc"]
+format = "[🤖 $output]($style) "
+style = "bold yellow"
+disabled = false
+
+[custom.ai_auto]
+command = '''
+case "$PWD" in
+  */ExampleOrg/*) printf "claude" ;;
+  *) printf "codex" ;;
+esac
+'''
+when = '[ -z "$AI_ASSISTANT" ]'
+shell = ["sh", "--norc"]
+format = "[🤖 $output]($style) "
+style = "dimmed"
+disabled = false
+

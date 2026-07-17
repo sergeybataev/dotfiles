@@ -1,0 +1,4 @@
+[tools]
+starship = "1.26.0"
+fzf = "0.74.0"
+zoxide = "0.10.0"

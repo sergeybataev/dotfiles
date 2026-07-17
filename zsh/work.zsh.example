@@ -1,0 +1,10 @@
+# work.zsh.example — work-only shell settings, kept OUT of zsh/.zshrc.
+#
+# Copy this to ~/.zsh/work.zsh and source it from your local (non-tracked)
+# ~/.zshrc, e.g.:
+#
+#   [[ -f ~/.zsh/work.zsh ]] && source ~/.zsh/work.zsh
+#
+# Adjust GOPRIVATE (and anything else private-org-specific) below.
+
+export GOPRIVATE=github.com/ExampleOrg
