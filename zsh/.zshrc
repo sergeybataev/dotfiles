@@ -213,7 +213,10 @@ fi
 autoload -Uz compinit
 _zcompdump="${ZDOTDIR:-$HOME}/.zcompdump"
 if __zshrc_stale "$_zcompdump" 24; then
-  [[ -n "$ZSHRC_DEBUG" ]] && echo "compinit: full rebuild (dump older than 24h or missing) — this is the likely source of the occasional slow-startup outlier"
+  # Always announce (not just under ZSHRC_DEBUG): the full rebuild is the
+  # likely source of the occasional slow-startup outlier, so print a one-line
+  # explanation whenever it happens to make those outliers self-explaining.
+  print -u2 "(rebuilding completion cache — first shell of the day is slower)"
   compinit -d "$_zcompdump"
 else
   compinit -C -d "$_zcompdump"
