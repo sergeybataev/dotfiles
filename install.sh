@@ -17,6 +17,13 @@ set -euo pipefail
 DOTFILES_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMESTAMP="$(date +%Y%m%d_%H%M%S)"
 
+# Work-only values (HOMELAB_CTX, etc.) come from the untracked ~/.zsh/work.zsh
+# if present — see zsh/work.zsh.example. Anything unset falls back to a
+# neutral default below.
+# shellcheck disable=SC1091
+[ -f "$HOME/.zsh/work.zsh" ] && . "$HOME/.zsh/work.zsh"
+: "${HOMELAB_CTX:=admin@homelab}"
+
 log() { printf '==> %s\n' "$1"; }
 
 backup_and_link() {
@@ -113,9 +120,9 @@ fi
 
 # --- 5. global git identity-guard hooks --------------------------------------
 # pre-commit/pre-push assert the resolved user.email matches the tree
-# (ExampleOrg vs sergeybataev); unknown trees stop and ask for an explicit
-# identity. The hooks chain to each repo's own .git/hooks/* so nothing local
-# is shadowed by the global core.hooksPath.
+# (work vs personal); unknown trees stop and ask for an explicit identity. The
+# hooks chain to each repo's own .git/hooks/* so nothing local is shadowed by
+# the global core.hooksPath.
 
 backup_and_link "$DOTFILES_DIR/git-hooks" "$HOME/.config/git/hooks"
 if command -v git >/dev/null 2>&1; then
@@ -124,23 +131,24 @@ if command -v git >/dev/null 2>&1; then
 fi
 
 # --- 6. standalone homelab kubeconfig ---------------------------------------
-# kube.zsh points non-ExampleOrg shells at ~/.kube/homelab.yaml. Generate it
-# once from the merged ~/.kube/config if the homelab context is available.
-# --minify keeps only that context, so enterprise creds never leak into it.
+# kube.zsh points non-work shells at ~/.kube/homelab.yaml. Generate it once
+# from the merged ~/.kube/config if the homelab context ($HOMELAB_CTX) is
+# available. --minify keeps only that context, so enterprise creds never leak
+# into it.
 
 if [ ! -f "$HOME/.kube/homelab.yaml" ]; then
   if command -v kubectl >/dev/null 2>&1 \
-     && kubectl config get-contexts admin@homelab >/dev/null 2>&1; then
+     && kubectl config get-contexts "$HOMELAB_CTX" >/dev/null 2>&1; then
     log "generating standalone homelab kubeconfig: ~/.kube/homelab.yaml"
     mkdir -p "$HOME/.kube"
-    kubectl config view --minify --flatten --context=admin@homelab > "$HOME/.kube/homelab.yaml"
+    kubectl config view --minify --flatten --context="$HOMELAB_CTX" > "$HOME/.kube/homelab.yaml"
     chmod 600 "$HOME/.kube/homelab.yaml"
   else
-    log "skipping ~/.kube/homelab.yaml (kubectl or admin@homelab context not available)"
+    log "skipping ~/.kube/homelab.yaml (kubectl or $HOMELAB_CTX context not available)"
   fi
 else
   log "~/.kube/homelab.yaml already exists"
 fi
 
 log "done. Start a new shell (or 'exec zsh') to pick everything up."
-log "If you need work-only settings (e.g. GOPRIVATE), copy zsh/work.zsh.example to ~/.zsh/work.zsh, edit it, and source it from a local (untracked) block in ~/.zshrc."
+log "If you need work-only settings (GOPRIVATE, WORK_ORG, …), copy zsh/work.zsh.example to ~/.zsh/work.zsh and edit it; zsh/.zshrc sources it automatically."

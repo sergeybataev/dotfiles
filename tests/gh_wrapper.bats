@@ -2,8 +2,13 @@
 # Tests for the directory-aware gh wrapper in zsh/ai.zsh. A stub gh binary
 # handles `auth switch` (rewriting the sandbox hosts.yml) and logs everything
 # else; the sandbox $HOME keeps the real gh state untouched.
+#
+# The wrapper reads WORK_ORG / WORK_GH_USER from the environment (normally
+# exported by ~/.zsh/work.zsh); the tests inject generic placeholder values.
 
 AI_ZSH="$BATS_TEST_DIRNAME/../zsh/ai.zsh"
+WORK_ORG="ExampleOrg"
+WORK_GH_USER="work-gh-user"
 
 setup() {
   FAKE_HOME="$BATS_TEST_TMPDIR/home"
@@ -11,7 +16,7 @@ setup() {
   CALL_LOG="$BATS_TEST_TMPDIR/called.log"
   HOSTS_YML="$FAKE_HOME/.config/gh/hosts.yml"
   mkdir -p "$FAKE_HOME/.config/gh" "$STUB_BIN"
-  mkdir -p "$FAKE_HOME/go/src/github.com/ExampleOrg/repo1"
+  mkdir -p "$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1"
   mkdir -p "$FAKE_HOME/go/src/github.com/sergeybataev/repo2"
   mkdir -p "$FAKE_HOME/elsewhere"
 
@@ -33,7 +38,7 @@ EOF
 }
 
 set_active() {
-  printf 'github.com:\n    git_protocol: https\n    users:\n        work-gh-user:\n        sergeybataev:\n    user: %s\n' "$1" > "$HOSTS_YML"
+  printf 'github.com:\n    git_protocol: https\n    users:\n        %s:\n        sergeybataev:\n    user: %s\n' "$WORK_GH_USER" "$1" > "$HOSTS_YML"
 }
 
 # run_gh <cwd> <gh-args...> — run the gh wrapper from <cwd> in the sandbox
@@ -42,6 +47,7 @@ run_gh() {
   shift
   run env HOME="$FAKE_HOME" PATH="$STUB_BIN:$PATH" CALL_LOG="$CALL_LOG" \
       HOSTS_YML="$HOSTS_YML" STUB_SWITCH_FAIL="${STUB_SWITCH_FAIL:-}" \
+      WORK_ORG="$WORK_ORG" WORK_GH_USER="$WORK_GH_USER" \
     zsh -c "cd '$cwd' && source '$AI_ZSH' && gh $*"
 }
 
@@ -72,16 +78,16 @@ run_gh() {
 
 @test "wrapper: auto-switches account in a work dir and announces it" {
   set_active sergeybataev
-  run_gh "$FAKE_HOME/go/src/github.com/ExampleOrg/repo1" pr list
+  run_gh "$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1" pr list
   [ "$status" -eq 0 ]
   [[ "$output" == *"switched"* ]]
-  grep -q "user: work-gh-user" "$HOSTS_YML"
+  grep -q "user: $WORK_GH_USER" "$HOSTS_YML"
   grep -q "REAL pr list" "$CALL_LOG"
 }
 
 @test "wrapper: no switch when account already matches" {
-  set_active work-gh-user
-  run_gh "$FAKE_HOME/go/src/github.com/ExampleOrg/repo1" pr list
+  set_active "$WORK_GH_USER"
+  run_gh "$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1" pr list
   [ "$status" -eq 0 ]
   [[ "$output" != *"switched"* ]]
   grep -q "REAL pr list" "$CALL_LOG"
@@ -90,7 +96,7 @@ run_gh() {
 @test "wrapper: blocks write op when switch fails and account mismatches" {
   set_active sergeybataev
   STUB_SWITCH_FAIL=1
-  run_gh "$FAKE_HOME/go/src/github.com/ExampleOrg/repo1" pr create --title x
+  run_gh "$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1" pr create --title x
   [ "$status" -ne 0 ]
   [ ! -f "$CALL_LOG" ]
 }
@@ -98,22 +104,22 @@ run_gh() {
 @test "wrapper: allows read op even when switch fails" {
   set_active sergeybataev
   STUB_SWITCH_FAIL=1
-  run_gh "$FAKE_HOME/go/src/github.com/ExampleOrg/repo1" pr list
+  run_gh "$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1" pr list
   [ "$status" -eq 0 ]
   grep -q "REAL pr list" "$CALL_LOG"
 }
 
 @test "wrapper: personal tree expects sergeybataev" {
-  set_active work-gh-user
+  set_active "$WORK_GH_USER"
   run_gh "$FAKE_HOME/go/src/github.com/sergeybataev/repo2" issue list
   [ "$status" -eq 0 ]
   grep -q "user: sergeybataev" "$HOSTS_YML"
 }
 
 @test "wrapper: unknown tree passes through without switching" {
-  set_active work-gh-user
+  set_active "$WORK_GH_USER"
   run_gh "$FAKE_HOME/elsewhere" pr create --title x
   [ "$status" -eq 0 ]
-  grep -q "user: work-gh-user" "$HOSTS_YML"
+  grep -q "user: $WORK_GH_USER" "$HOSTS_YML"
   grep -q "REAL pr create --title x" "$CALL_LOG"
 }

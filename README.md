@@ -10,7 +10,27 @@ git clone https://github.com/sergeybataev/dotfiles.git && ~/dotfiles/install.sh
 
 `install.sh` is idempotent: installs mise if missing, installs the pinned tool versions, clones the zsh plugins (autosuggestions, fzf-tab, fast-syntax-highlighting, history-substring-search), and symlinks `.zshrc` / `starship.toml` / `ai.zsh` / `zhelp.zsh` / `kube.zsh` / `bin/ws` / `atuin/config.toml` / `ghostty/config` + `ghostty/theme.conf` into place (backing up anything already there). It also links `git-hooks/` as the global `core.hooksPath` (identity guards), generates a standalone `~/.kube/homelab.yaml` if the homelab context is available, and backs up the ghostty Application Support config so the XDG copy is the single source of truth.
 
-Work-only settings (e.g. `GOPRIVATE`) are kept out of the tracked `.zshrc` — see `zsh/work.zsh.example` (shell-level) and `mise/org-example.mise.toml` (mise project-scoped equivalent — drop it at the root of a directory tree and `mise trust` it).
+### Work-specific setup (`work.zsh`)
+
+This repo is public, so nothing employer-specific is hard-coded. All the work/homelab specifics live in an **untracked** `~/.zsh/work.zsh` (gitignored) that a few modules read as environment variables:
+
+```sh
+cp zsh/work.zsh.example ~/.zsh/work.zsh   # then edit the values
+```
+
+`zsh/.zshrc` sources it early, and `kube.zsh`, `bin/ws`, `zhelp.zsh`, and the git identity hooks self-source it too, so it works whether installed via symlink or copy. Variables it defines:
+
+| Variable | Purpose |
+|---|---|
+| `WORK_ORG` | GitHub org that marks a "work" directory tree (`~/go/src/github.com/$WORK_ORG/...`). Drives AI routing, the starship work box, KUBECONFIG binding, and the gh/git identity guards. |
+| `WORK_REPO` | Primary work repo dir name — `ws` opens the workspace at `$WORK_ORG/$WORK_REPO`. |
+| `WORK_GH_USER` | gh CLI username the wrapper switches to inside work trees. |
+| `WORK_LABEL` | Short label shown in the starship work box. |
+| `HOMELAB` / `HOMELAB_CTX` | Homelab repo dir name and kube context. |
+| `WORK_GITCONFIG` | Path to your work `user.email`/`name` git config (defaults to `~/.gitconfig-work`). Point it at your existing work gitconfig, or create `~/.gitconfig-work`. |
+| `GOPRIVATE` | Go private module prefix for your work org. |
+
+`mise/org-example.mise.toml` is the mise project-scoped equivalent for env vars like `GOPRIVATE` — drop it at the root of a directory tree and `mise trust` it.
 
 `mise/config.toml` also pins `bat`, `difftastic`, `ripgrep`, `kubie`, and `bats` (test runner for `tests/*.bats`) at user scope (alongside starship/fzf/zoxide); these can coexist with Nix-provided copies of the same tools since mise shims win on `$PATH`.
 
@@ -36,7 +56,7 @@ One deliberately manual step: importing old-machine shell history into atuin. `a
 - `ai <question>` — one-shot prompt to the active assistant.
 - `aix <task>` — same, but asks for a shell command only (prints it, doesn't run it).
 - `wtf` — explains why the last command failed. Includes actual output when it can: if run inside tmux, the last ~50 lines of the pane's scrollback are attached (labeled as possibly containing unrelated lines); otherwise it prints a tip to use `wtf -r`. `wtf -r` re-runs the last command with stdout+stderr captured to a temp file and includes that output — it warns first and requires an explicit `y` confirmation (default No), since re-running a destructive command is exactly the kind of thing you don't want to do by accident.
-- Routing: `$AI_ASSISTANT` override > `claude` under any `*/ExampleOrg/*` path (or your own org, edit to taste) > `codex` elsewhere. Falls back to whatever's actually installed.
+- Routing: `$AI_ASSISTANT` override > `claude` under any `*/$WORK_ORG/*` path (your work org, set in `work.zsh`) > `codex` elsewhere. Falls back to whatever's actually installed.
 - **Strict work-dir guard**: under a work path, `codex`/`agy` are refused outright (even via an explicit `$AI_ASSISTANT` override) and `claude` is used instead, with a one-line refusal printed to stderr. `Ctrl-X a` also drops `codex`/`agy` from the cycle while inside a work directory.
 - The starship prompt shows the active assistant (bold bright-yellow = manual override, plain yellow = auto — see prompt notes below on why it's no longer `dimmed`).
 
@@ -46,17 +66,17 @@ Run `zhelp` (or `zh`) for a compact, colorized cheat sheet covering keybindings,
 
 ## Kube context routing & guard (`kube.zsh`)
 
-- **Per-directory `KUBECONFIG` binding**: a `chpwd` hook points non-ExampleOrg shells at a standalone homelab kubeconfig (`~/.kube/homelab.yaml`, current-context `admin@homelab`) and ExampleOrg shells at `~/.kube/config` (where `workctl` writes enterprise creds — current-context left exactly as workctl set it). Env-based only: nothing ever mutates `~/.kube/config`, and the hook backs off inside kubie subshells. `kubie ctx <ctx>` remains the tool for explicit ad-hoc switches.
+- **Per-directory `KUBECONFIG` binding**: a `chpwd` hook points non-work shells at a standalone homelab kubeconfig (`~/.kube/homelab.yaml`, current-context `$HOMELAB_CTX`) and work shells (`*/$WORK_ORG/*`) at `~/.kube/config` (where the enterprise CLI writes creds — current-context left exactly as it was set). Env-based only: nothing ever mutates `~/.kube/config`, and the hook backs off inside kubie subshells. `kubie ctx <ctx>` remains the tool for explicit ad-hoc switches.
 - **Destructive-verb guard**: `kubectl delete` / `drain` / `cordon` on **any** context except homelab prints context + kubeconfig + namespace + command and demands a hardware-key confirmation (YubiKey present + typed context name; upgrade path to a touch-verified GPG signature is marked TODO in `kube.zsh` pending on-card key enrollment). No y/N, no bypass flag: scripts/CI never load the wrapper (interactive-only), and inside an interactive shell a guarded verb can't run unattended. Tested in `tests/kube_guard.bats`.
 
 ## Identity guards (git + gh)
 
-- **git**: global `core.hooksPath` pre-commit/pre-push hooks block commits/pushes whose `user.email` doesn't match the tree (ExampleOrg → work email, sergeybataev → personal). Repos outside both trees stop and prompt once for an explicit identity (written as a local override) instead of silently defaulting to personal. Both hooks chain to each repo's own `.git/hooks/*`. Tested in `tests/identity_hooks.bats`.
+- **git**: global `core.hooksPath` pre-commit/pre-push hooks block commits/pushes whose `user.email` doesn't match the tree (work tree `*/$WORK_ORG/*` → `$WORK_GITCONFIG` email, `sergeybataev` → personal). Repos outside both trees stop and prompt once for an explicit identity (written as a local override) instead of silently defaulting to personal. Both hooks chain to each repo's own `.git/hooks/*`. Tested in `tests/identity_hooks.bats`.
 - **gh**: a wrapper in `ai.zsh` auto-runs `gh auth switch` to match the cwd's tree and prints a one-line notice on every flip; if the account still mismatches, write ops (`pr create`, `repo edit`, mutating `api` calls, …) are refused. Tested in `tests/gh_wrapper.bats`.
 
 ## Workspaces (`ws`)
 
-`ws` is an fzf picker that builds ghostty layouts on demand via the AppleScript API (ghostty 1.3+; there's no native session save/restore, so layouts are recreated fresh each launch): **work** = 1 window, 3 tabs × 2 vertical panes at the work-repo root; **homelab** = a sub-menu of `k8s-watchers` (node/kerr/rook-ceph watchers + agent + investigation panes, each auto-entering `kubie ctx admin@homelab`), `agents-2`, `agents-4`, and `just-terminal`, all at the homelab root. Pane sizing is best-effort (ghostty splits ~equally).
+`ws` is an fzf picker that builds ghostty layouts on demand via the AppleScript API (ghostty 1.3+; there's no native session save/restore, so layouts are recreated fresh each launch): **work** = 1 window, 3 tabs × 2 vertical panes at the `$WORK_ORG/$WORK_REPO` root; **homelab** = a sub-menu of `k8s-watchers` (node/kerr/rook-ceph watchers + agent + investigation panes, each auto-entering `kubie ctx $HOMELAB_CTX`), `agents-2`, `agents-4`, and `just-terminal`, all at the homelab root. Pane sizing is best-effort (ghostty splits ~equally).
 
 ## Theme (ghostty)
 
@@ -64,7 +84,7 @@ Run `zhelp` (or `zh`) for a compact, colorized cheat sheet covering keybindings,
 
 ## Prompt segments (starship)
 
-- `[ Work ]` — a filled rust-red (`#c05a5a`) box leading the prompt only under `*/ExampleOrg/*`; personal trees show nothing. This is the work-identity tell (kept deliberately distinct from the bright `#ff7a85` dangerous-context red).
+- `[ $WORK_LABEL ]` — a filled rust-red (`#c05a5a`) box leading the prompt only under `*/$WORK_ORG/*`; personal trees show nothing. This is the work-identity tell (kept deliberately distinct from the bright `#ff7a85` dangerous-context red).
 - `☸ <context> (<namespace>)` — always on when a context resolves; three severity tiers by context name: `*prod*` = bold bright red `#ff7a85`, `*stag*` = bold amber `#f2d08a`, everything else = bold bright-blue. Color = severity of the target; the delete/drain/cordon guard stays armed on all non-homelab contexts regardless of tier.
 - `⚙ <dirname>` — shown when the current directory (or an ancestor, up to `$HOME`) has its own `mise.toml` / `.mise.toml` / `.tool-versions`; prints that ancestor's directory name. Nothing is shown otherwise (kept deliberately quiet rather than a fallback label). Computed with a pure-shell walk-up — no `mise` process spawned per prompt.
 - `🤖 <assistant>` — see AI helpers above.

@@ -1,10 +1,39 @@
-# work.zsh.example — work-only shell settings, kept OUT of zsh/.zshrc.
+# work.zsh.example — work-only shell settings, kept OUT of the tracked repo.
 #
-# Copy this to ~/.zsh/work.zsh and source it from your local (non-tracked)
-# ~/.zshrc, e.g.:
+# Copy this to ~/.zsh/work.zsh (gitignored). It is sourced early by zsh/.zshrc,
+# and also self-sourced by the individual modules that need it (kube.zsh,
+# bin/ws, the git identity hooks), so your private, work-specific values never
+# have to live in this public repo.
 #
-#   [[ -f ~/.zsh/work.zsh ]] && source ~/.zsh/work.zsh
+#   cp zsh/work.zsh.example ~/.zsh/work.zsh   # then edit the values below
 #
-# Adjust GOPRIVATE (and anything else private-org-specific) below.
+# Keep this file POSIX-clean (plain `export VAR="value"`, no zsh-isms): it is
+# also sourced by the git identity hooks under /bin/sh, not just by zsh.
 
-export GOPRIVATE=github.com/ExampleOrg
+# The GitHub org (the path segment ~/go/src/github.com/<org>/...) that marks a
+# "work" directory tree. Drives: AI routing (claude-only under work trees), the
+# starship work box, per-directory KUBECONFIG binding, and the gh/git identity
+# guards. Leave unset to disable all work-tree behavior.
+export WORK_ORG="YourOrg"
+
+# Your primary work repo directory name — used by `ws` to open the workspace at
+# ~/go/src/github.com/$WORK_ORG/$WORK_REPO.
+export WORK_REPO="your-repo"
+
+# The gh CLI username the gh wrapper switches to inside work trees.
+export WORK_GH_USER="your-work-gh-username"
+
+# Short label shown in the starship work box when under a work tree.
+export WORK_LABEL="Work"
+
+# Homelab (personal infra) kube context + repo dir name, used by kube.zsh / ws.
+export HOMELAB="homelab"
+export HOMELAB_CTX="admin@homelab"
+
+# Path to the git config file holding your work user.email / user.name. Used by
+# the identity hooks for work trees. Defaults to ~/.gitconfig-work if unset —
+# either create that file, or point this at your existing work gitconfig.
+export WORK_GITCONFIG="$HOME/.gitconfig-work"
+
+# Go private module prefix for your work org.
+export GOPRIVATE="github.com/$WORK_ORG"

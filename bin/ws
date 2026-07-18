@@ -9,20 +9,25 @@
 #
 # Usage:
 #   ws                       fzf picker (work / homelab -> sub-menu)
-#   ws work                  1 window, 3 tabs, each 2 vertical panes, work-repo
+#   ws work                  1 window, 3 tabs, each 2 vertical panes, work repo
 #   ws homelab [layout]      k8s-watchers | agents-2 | agents-4 | just-terminal
 #   ws --dry-run <...>       print the AppleScript instead of running it
 #
 # Pane sizing is best-effort: ghostty splits ~equally and exact ratios are
 # not scriptable today.
+#
+# Work/homelab specifics (org, repo, homelab dir + context) come from the
+# untracked ~/.zsh/work.zsh — see zsh/work.zsh.example.
 
 set -u
 
-WORK_DIR="$HOME/go/src/github.com/ExampleOrg/work-repo"
-HOMELAB_DIR="$HOME/go/src/github.com/sergeybataev/homelab"
+[[ -f "$HOME/.zsh/work.zsh" ]] && source "$HOME/.zsh/work.zsh"
+
+WORK_DIR="$HOME/go/src/github.com/${WORK_ORG:-}/${WORK_REPO:-}"
+HOMELAB_DIR="$HOME/go/src/github.com/sergeybataev/${HOMELAB:-homelab}"
 # every k8s-watchers pane enters the homelab context first (explicit launcher
 # step, independent of the cd-triggered KUBECONFIG binding in kube.zsh)
-KUBIE_LINE='kubie ctx admin@homelab'
+KUBIE_LINE="kubie ctx ${HOMELAB_CTX:-admin@homelab}"
 
 DRY_RUN=0
 

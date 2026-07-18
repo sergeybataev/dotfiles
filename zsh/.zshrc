@@ -179,8 +179,11 @@ export GO111MODULE="on"
 export GOROOT=/usr/local/go
 export GOPATH=~/go
 
-# Work-only settings (GOPRIVATE, etc.) live in zsh/work.zsh.example — copy that
-# to ~/.zsh/work.zsh and source it separately if you need it.
+# Work-only settings (GOPRIVATE, WORK_ORG, WORK_GH_USER, WORK_LABEL, …) live in
+# an untracked ~/.zsh/work.zsh — see zsh/work.zsh.example. Sourced here early so
+# the identity/routing modules (ai.zsh, kube.zsh, zhelp.zsh) and the starship
+# prompt can see the exported values.
+[[ -f ~/.zsh/work.zsh ]] && source ~/.zsh/work.zsh
 
 export PATH=$HOME/bin:/usr/local/bin:$HOME/go/bin:$HOME/.local/bin:/usr/local/go/bin:$PATH
 
@@ -274,7 +277,7 @@ fi
 [[ -f ~/.zsh/ai.zsh ]] && source ~/.zsh/ai.zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark ai.zsh
 
-# kube.zsh — per-directory KUBECONFIG binding (ExampleOrg ↔ homelab)
+# kube.zsh — per-directory KUBECONFIG binding (work ↔ homelab)
 [[ -f ~/.zsh/kube.zsh ]] && source ~/.zsh/kube.zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark kube.zsh
 

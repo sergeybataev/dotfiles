@@ -45,7 +45,7 @@ $refs
 EOF
 else
   if ! git config --local user.email >/dev/null 2>&1; then
-    idguard_die "push blocked — repo outside ExampleOrg/sergeybataev trees, no local identity chosen" \
+    idguard_die "push blocked — repo outside known work/personal trees, no local identity chosen" \
       "repo: $top" \
       "pick one explicitly with: git config user.email <email>"
   fi

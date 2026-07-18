@@ -9,6 +9,10 @@
 # `zh <filter>`) does a case-insensitive grep over it, e.g. `zhelp ai`,
 # `zhelp history`.
 
+# Work-tree labels (WORK_ORG, WORK_LABEL, WORK_REPO, HOMELAB) come from the
+# untracked ~/.zsh/work.zsh — see zsh/work.zsh.example.
+[[ -f "$HOME/.zsh/work.zsh" ]] && source "$HOME/.zsh/work.zsh"
+
 zhelp() {
   local filter="$1"
   local -a lines
@@ -34,7 +38,7 @@ zhelp() {
     "  %F{white}wtf%f                 %F{8}explain why the last command failed%f"
     "  %F{white}  (in tmux)%f         %F{8}also attaches the last ~50 lines of pane scrollback%f"
     "  %F{white}wtf -r%f              %F{8}re-runs the last command (stdout+stderr captured) — asks y/N first%f"
-    "  %F{white}strict work-dir rule%f %F{8}under */ExampleOrg/* only claude is used, codex/agy refused%f"
+    "  %F{white}strict work-dir rule%f %F{8}under */${WORK_ORG:-<work-org>}/* only claude is used, codex/agy refused%f"
     "  %F{white}🤖 prompt segment%f    %F{8}bold bright-yellow = manual \$AI_ASSISTANT override, plain yellow = auto (cwd default)%f"
     ""
     "%B%F{cyan}Custom commands / aliases%f%b"
@@ -44,19 +48,19 @@ zhelp() {
     "  %F{white}kerr%f                %F{8}list all pods across namespaces that are NOT Running%f"
     "  %F{white}kubie ctx <ctx>%f     %F{8}explicit kube context switch in an isolated subshell (never edits ~/.kube/config)%f"
     "  %F{white}kubectl guard%f       %F{8}delete/drain/cordon on any non-homelab context needs a hardware-key confirm — no bypass%f"
-    "  %F{white}auto KUBECONFIG%f     %F{8}cd into */ExampleOrg/* → ~/.kube/config (workctl creds); elsewhere → homelab kubeconfig%f"
+    "  %F{white}auto KUBECONFIG%f     %F{8}cd into */${WORK_ORG:-<work-org>}/* → ~/.kube/config (enterprise creds); elsewhere → homelab kubeconfig%f"
     "  %F{white}gh (wrapped)%f        %F{8}auto-switches gh account per tree (announced); write ops blocked on wrong account%f"
     "  %F{white}git identity guard%f  %F{8}pre-commit/pre-push block wrong user.email per tree; unknown repos prompt once%f"
     "  %F{white}zshv / zshs%f         %F{8}edit / reload ~/.zshrc%f"
     "  %F{white}tm%f                  %F{8}attach to (or create) a tmux session%f"
     "  %F{white}fixm%f                %F{8}reset terminal mouse-reporting after a dropped ssh session%f"
     "  %F{white}z / zi%f              %F{8}zoxide: jump to a frecent directory / interactive picker%f"
-    "  %F{white}ws%f                  %F{8}ghostty workspace launcher (fzf): work = 3 tabs × 2 panes at work-repo%f"
-    "  %F{white}ws homelab%f          %F{8}sub-menu: k8s-watchers / agents-2 / agents-4 / just-terminal (homelab dir)%f"
+    "  %F{white}ws%f                  %F{8}ghostty workspace launcher (fzf): work = 3 tabs × 2 panes at ${WORK_REPO:-<work-repo>}%f"
+    "  %F{white}ws homelab%f          %F{8}sub-menu: k8s-watchers / agents-2 / agents-4 / just-terminal (${HOMELAB:-homelab} dir)%f"
     ""
     "%B%F{cyan}Prompt segments legend%f%b"
     "  %F{white}⚙ <dirname>%f         %F{8}nearest ancestor dir with its own mise.toml/.mise.toml/.tool-versions%f"
-    "  %F{white}[ Work ] box%f        %F{8}rust-red filled box leading the prompt = you're under */ExampleOrg/* (work identity)%f"
+    "  %F{white}[ ${WORK_LABEL:-Work} ] box%f        %F{8}rust-red filled box leading the prompt = you're under */${WORK_ORG:-<work-org>}/* (work identity)%f"
     "  %F{white}☸ <ctx> (<ns>)%f      %F{8}current kubectl context (and namespace, if set)%f"
     "  %F{white}☸ color tiers%f       %F{8}*prod* = bright red, *stag* = amber, everything else = blue; guard is armed on ALL non-homelab regardless of color%f"
     "  %F{white}🤖 <assistant>%f      %F{8}active AI assistant — see AI commands above%f"

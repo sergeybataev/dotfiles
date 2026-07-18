@@ -13,12 +13,12 @@ run_zsh() {
 }
 
 @test "needs_confirm: delete on enterprise context is guarded" {
-  run_zsh '_kube_guard_needs_confirm delete admin.example-dev.example-dev.oci'
+  run_zsh '_kube_guard_needs_confirm delete admin.dev.dev.oci'
   [ "$status" -eq 0 ]
 }
 
 @test "needs_confirm: drain on enterprise context is guarded" {
-  run_zsh '_kube_guard_needs_confirm drain admin.example-staging.example-staging.oci'
+  run_zsh '_kube_guard_needs_confirm drain admin.staging.staging.oci'
   [ "$status" -eq 0 ]
 }
 
@@ -38,12 +38,12 @@ run_zsh() {
 }
 
 @test "needs_confirm: get on enterprise context is NOT guarded" {
-  run_zsh '_kube_guard_needs_confirm get admin.example-dev.example-dev.oci'
+  run_zsh '_kube_guard_needs_confirm get admin.dev.dev.oci'
   [ "$status" -eq 1 ]
 }
 
 @test "needs_confirm: apply on enterprise context is NOT guarded (spec: not apply/scale)" {
-  run_zsh '_kube_guard_needs_confirm apply admin.example-dev.example-dev.oci'
+  run_zsh '_kube_guard_needs_confirm apply admin.dev.dev.oci'
   [ "$status" -eq 1 ]
 }
 
@@ -82,19 +82,19 @@ run_wrapper() {
 }
 
 @test "wrapper: get passes through untouched on enterprise context" {
-  run_wrapper 1 admin.example-dev.example-dev.oci get pods
+  run_wrapper 1 admin.dev.dev.oci get pods
   [ "$status" -eq 0 ]
   grep -q "REAL get pods" "$CALL_LOG"
 }
 
 @test "wrapper: delete on enterprise context is blocked when confirm fails" {
-  run_wrapper 1 admin.example-dev.example-dev.oci delete pod foo
+  run_wrapper 1 admin.dev.dev.oci delete pod foo
   [ "$status" -ne 0 ]
   [ ! -f "$CALL_LOG" ]
 }
 
 @test "wrapper: delete on enterprise context runs when confirm succeeds" {
-  run_wrapper 0 admin.example-dev.example-dev.oci delete pod foo
+  run_wrapper 0 admin.dev.dev.oci delete pod foo
   [ "$status" -eq 0 ]
   grep -q "REAL delete pod foo" "$CALL_LOG"
 }
@@ -106,13 +106,13 @@ run_wrapper() {
 }
 
 @test "wrapper: verb found after value-taking global flags" {
-  run_wrapper 1 admin.example-dev.example-dev.oci -n kube-system delete pod foo
+  run_wrapper 1 admin.dev.dev.oci -n kube-system delete pod foo
   [ "$status" -ne 0 ]
   [ ! -f "$CALL_LOG" ]
 }
 
 @test "wrapper: explicit --context=homelab overrides guarded current-context" {
-  run_wrapper 1 admin.example-dev.example-dev.oci --context=admin@homelab delete pod foo
+  run_wrapper 1 admin.dev.dev.oci --context=admin@homelab delete pod foo
   [ "$status" -eq 0 ]
   grep -q "REAL --context=admin@homelab delete pod foo" "$CALL_LOG"
 }

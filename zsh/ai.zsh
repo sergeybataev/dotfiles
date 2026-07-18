@@ -1,5 +1,10 @@
 # ai.zsh — opt-in AI helpers with per-cwd assistant routing
 #
+# Work-tree specifics (WORK_ORG, WORK_GH_USER) come from the untracked
+# ~/.zsh/work.zsh — see zsh/work.zsh.example. Self-sourced so this module keeps
+# working when installed standalone.
+[[ -f "$HOME/.zsh/work.zsh" ]] && source "$HOME/.zsh/work.zsh"
+#
 # Binaries checked at write-time on this machine (all present):
 #   claude -> ~/.local/bin/claude   (one-shot: `claude -p "<prompt>"`)
 #   codex  -> ~/.local/bin/codex    (one-shot: `codex exec "<prompt>"`)
@@ -20,18 +25,19 @@ _ai_available_assistants() {
   done
 }
 
-# _ai_in_workdir: true (0) if $PWD is under a work directory
-# (~/go/src/github.com/ExampleOrg or any path containing /ExampleOrg/).
+# _ai_in_workdir: true (0) if $PWD is under a work directory (any path
+# containing /$WORK_ORG/). WORK_ORG comes from the untracked ~/.zsh/work.zsh
+# (see zsh/work.zsh.example); unset -> never a work directory.
 _ai_in_workdir() {
-  [[ "$PWD" == */ExampleOrg/* ]]
+  [[ -n "$WORK_ORG" && "$PWD" == */${WORK_ORG}/* ]]
 }
 
 # _ai_assistant: echo the name of the currently-active assistant.
 #   1. $AI_ASSISTANT session override, if set, available, and not blocked by
 #      the work-dir guard below.
-#   2. cwd under ~/go/src/github.com/ExampleOrg (or any path containing
-#      /ExampleOrg/) -> claude (work dirs must use claude only — HARD guard,
-#      codex/agy are refused even if explicitly selected via $AI_ASSISTANT).
+#   2. cwd under a work tree (any path containing /$WORK_ORG/) -> claude (work
+#      dirs must use claude only — HARD guard, codex/agy are refused even if
+#      explicitly selected via $AI_ASSISTANT).
 #   3. otherwise -> codex (personal default), falling back to whatever exists.
 _ai_assistant() {
   local available="$(_ai_available_assistants)"
@@ -298,8 +304,11 @@ bindkey '^X^A' ai-fix-buffer
 # _gh_expected_account: the gh account the cwd's tree expects, empty if the
 # cwd is outside both known trees (unknown trees are not governed).
 _gh_expected_account() {
+  if [[ -n "$WORK_ORG" && "$PWD" == */${WORK_ORG}/* ]]; then
+    print -n "$WORK_GH_USER"
+    return
+  fi
   case "$PWD" in
-    */ExampleOrg/*) print -n "work-gh-user" ;;
     */sergeybataev/*) print -n "sergeybataev" ;;
   esac
 }

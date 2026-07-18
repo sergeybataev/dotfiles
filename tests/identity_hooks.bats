@@ -2,16 +2,21 @@
 # Tests for the global git identity-guard hooks (git-hooks/pre-commit,
 # git-hooks/pre-push). Everything runs in a sandbox $HOME with fake identity
 # include files — the real ~/.gitconfig* is never touched.
+#
+# The hooks read WORK_ORG / WORK_GITCONFIG from the environment (normally
+# exported by ~/.zsh/work.zsh); the tests inject generic placeholder values.
 
 HOOKS_DIR="$BATS_TEST_DIRNAME/../git-hooks"
+WORK_ORG="ExampleOrg"
 
 setup() {
   FAKE_HOME="$BATS_TEST_TMPDIR/home"
   mkdir -p "$FAKE_HOME"
-  printf '[user]\n    email = work@example.test\n    name = Work Id\n' > "$FAKE_HOME/.gitconfig-work"
+  WORK_GITCONFIG="$FAKE_HOME/.gitconfig-work"
+  printf '[user]\n    email = work@example.test\n    name = Work Id\n' > "$WORK_GITCONFIG"
   printf '[user]\n    email = me@personal.test\n    name = Personal Id\n' > "$FAKE_HOME/.gitconfig-personal"
 
-  WORK_REPO_DIR="$FAKE_HOME/go/src/github.com/ExampleOrg/repo1"
+  WORK_REPO_DIR="$FAKE_HOME/go/src/github.com/$WORK_ORG/repo1"
   PERS_REPO="$FAKE_HOME/go/src/github.com/sergeybataev/repo2"
   UNKNOWN_REPO="$FAKE_HOME/other/repo3"
   for r in "$WORK_REPO_DIR" "$PERS_REPO" "$UNKNOWN_REPO"; do
@@ -25,6 +30,7 @@ setup() {
 run_hook() {
   local hook="$1" repo="$2"
   run env HOME="$FAKE_HOME" GIT_CONFIG_GLOBAL="$FAKE_HOME/.gitconfig" \
+    WORK_ORG="$WORK_ORG" WORK_GITCONFIG="$WORK_GITCONFIG" \
     bash -c "cd '$repo' && '$HOOKS_DIR/$hook' < /dev/null"
 }
 
@@ -90,6 +96,7 @@ run_prepush() {
   local sha
   sha="$(git -C "$repo" rev-parse HEAD)"
   run env HOME="$FAKE_HOME" GIT_CONFIG_GLOBAL="$FAKE_HOME/.gitconfig" \
+    WORK_ORG="$WORK_ORG" WORK_GITCONFIG="$WORK_GITCONFIG" \
     bash -c "cd '$repo' && echo 'refs/heads/main $sha refs/heads/main 0000000000000000000000000000000000000000' | '$HOOKS_DIR/pre-push' origin git@example.com:x/y.git"
 }
 

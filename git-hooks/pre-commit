@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # Global pre-commit identity guard (installed via core.hooksPath).
 #
-#   ExampleOrg trees   -> user.email must be the ~/.gitconfig-work email
+#   work trees          -> user.email must be the $WORK_GITCONFIG email
 #   sergeybataev trees  -> user.email must be the ~/.gitconfig-personal email
 #   anywhere else       -> no silent personal fallback: block until an
 #                          identity is consciously chosen (written once as a
 #                          local repo override, so it only prompts once).
+#
+# "work trees" and $WORK_GITCONFIG are defined by the untracked ~/.zsh/work.zsh
+# (WORK_ORG, WORK_GITCONFIG) — see zsh/work.zsh.example.
 #
 # Chains to the repo's own .git/hooks/pre-commit at the end, since a global
 # core.hooksPath would otherwise shadow per-repo hooks.
@@ -25,11 +28,11 @@ if [ -n "$expected" ]; then
   fi
 else
   if ! git config --local user.email >/dev/null 2>&1; then
-    work_email="$(git config -f "$HOME/.gitconfig-work" user.email 2>/dev/null || true)"
+    work_email="$(git config -f "$WORK_GITCONFIG" user.email 2>/dev/null || true)"
     personal_email="$(git config -f "$HOME/.gitconfig-personal" user.email 2>/dev/null || true)"
     if [ -t 2 ] && { exec 9</dev/tty; } 2>/dev/null; then
       {
-        echo "identity guard: this repo is outside the ExampleOrg/sergeybataev trees and has no local identity."
+        echo "identity guard: this repo is outside the known work/personal trees and has no local identity."
         echo "  1) work     ($work_email)"
         echo "  2) personal ($personal_email)"
         echo "  3) other    (enter manually)"
@@ -39,7 +42,7 @@ else
       case "$choice" in
         1)
           git config user.email "$work_email"
-          git config user.name "$(git config -f "$HOME/.gitconfig-work" user.name)"
+          git config user.name "$(git config -f "$WORK_GITCONFIG" user.name)"
           ;;
         2)
           git config user.email "$personal_email"
@@ -57,7 +60,7 @@ else
       esac
       echo "identity guard: written as a local override for this repo (git config --local user.email)" >&2
     else
-      idguard_die "commit blocked — repo outside ExampleOrg/sergeybataev trees, no local identity chosen" \
+      idguard_die "commit blocked — repo outside known work/personal trees, no local identity chosen" \
         "repo: $top" \
         "pick one explicitly, e.g.: git config user.email '$personal_email'"
     fi

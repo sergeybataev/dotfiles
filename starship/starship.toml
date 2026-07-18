@@ -1,8 +1,8 @@
 "$schema" = 'https://starship.rs/config-schema.json'
 
 # ${custom.work} must lead the line (it's the work-identity tell), so custom
-# modules are referenced individually — a bare $custom would render work a
-# second time in place.
+# modules are referenced individually — a bare $custom would render the work
+# box a second time in place.
 format = """
 ${custom.work}\
 $directory\
@@ -64,7 +64,7 @@ format = "[$symbol$context( \\($namespace\\))]($style) "
 # Context names here are lowercase anyway (kubectl config get-contexts).
 [[kubernetes.contexts]]
 context_pattern = ".*prod.*"
-style = "bold #ff7a85"              # bright alarm red — distinct from the rust Work box
+style = "bold #ff7a85"              # bright alarm red — distinct from the rust work box
 
 [[kubernetes.contexts]]
 context_pattern = ".*stag.*"        # matches staging / stage
@@ -75,15 +75,18 @@ min_time = 500
 style = "bold yellow"
 format = "took [$duration]($style)"
 
-# Work-identity tell: a filled rust-red "Work" box leading the prompt, ONLY
-# under */ExampleOrg/* (same cwd test as ai.zsh / custom.ai_auto). Personal
-# trees show nothing — the box is the whole tell; ❯ and directory keep base
-# colors in both zones. This IS the identity segment: rust #c05a5a fill is
-# deliberately muted/distinct from the bright #ff7a85 dangerous-context red
-# used by the ☸ prod tier (box leads the line, ☸ red appears mid-line).
+# Work-identity tell: a filled rust-red box (labeled $WORK_LABEL) leading the
+# prompt, ONLY under */$WORK_ORG/* (same cwd test as ai.zsh / custom.ai_auto).
+# WORK_ORG/WORK_LABEL are exported by the untracked ~/.zsh/work.zsh and inherited
+# by the `sh` that runs the command/when below; if WORK_ORG is unset the box
+# simply never renders. Personal trees show nothing — the box is the whole tell;
+# ❯ and directory keep base colors in both zones. This IS the identity segment:
+# rust #c05a5a fill is deliberately muted/distinct from the bright #ff7a85
+# dangerous-context red used by the ☸ prod tier (box leads the line, ☸ red
+# appears mid-line).
 [custom.work]
-command = 'printf "Work"'
-when = 'case "$PWD" in */ExampleOrg/*) exit 0 ;; *) exit 1 ;; esac'
+command = 'printf "%s" "${WORK_LABEL:-Work}"'
+when = 'test -n "$WORK_ORG" && case "$PWD" in */"$WORK_ORG"/*) exit 0 ;; *) exit 1 ;; esac'
 shell = ["sh", "--norc"]
 format = "[ $output ]($style) "
 style = "bold fg:#eef2f8 bg:#c05a5a"
@@ -110,7 +113,7 @@ disabled = false
 [custom.ai_auto]
 command = '''
 case "$PWD" in
-  */ExampleOrg/*) printf "claude" ;;
+  */"$WORK_ORG"/*) [ -n "$WORK_ORG" ] && printf "claude" || printf "codex" ;;
   *) printf "codex" ;;
 esac
 '''
@@ -122,8 +125,8 @@ disabled = false
 
 # Active mise project-config indicator: prints the basename of the nearest
 # ancestor directory (walking up from $PWD toward $HOME) that has its own
-# mise.toml / .mise.toml / .tool-versions, e.g. "ExampleOrg" when under
-# ~/go/src/github.com/ExampleOrg/mise.toml. Bold bright-green when found. Prints
+# mise.toml / .mise.toml / .tool-versions, e.g. the org dir name when under
+# ~/go/src/github.com/<org>/mise.toml. Bold bright-green when found. Prints
 # nothing when no project config exists anywhere up to $HOME — chosen over
 # a dim "mise" fallback for cleanliness (most dirs have no project config,
 # and a fallback label would be noise most of the time). Icon: ⚙ (distinct
@@ -162,4 +165,3 @@ shell = ["sh", "--norc"]
 format = "[⚙ $output]($style) "
 style = "bold bright-green"
 disabled = false
-
