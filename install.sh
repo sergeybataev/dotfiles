@@ -96,6 +96,7 @@ backup_and_link "$DOTFILES_DIR/zsh/zhelp.zsh"     "$HOME/.zsh/zhelp.zsh"
 backup_and_link "$DOTFILES_DIR/zsh/kube.zsh"      "$HOME/.zsh/kube.zsh"
 backup_and_link "$DOTFILES_DIR/bin/ws"            "$HOME/.local/bin/ws"
 backup_and_link "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
+backup_and_link "$DOTFILES_DIR/atuin/config.toml" "$HOME/.config/atuin/config.toml"
 
 # ghostty: both files go to the XDG path so the bare `config-file = theme.conf`
 # relative include resolves next to the including file. The Application

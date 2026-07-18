@@ -322,10 +322,12 @@ if (( $+commands[fzf] )); then
 fi
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark fzf
 
-# atuin — Ctrl-R fuzzy history search; keep the default up-arrow prefix
-# search. Cached (>15ms measured cost), same invalidation as mise above.
+# atuin — Ctrl-R global fuzzy history search; up-arrow is atuin too, scoped
+# to the current directory (filter_mode_shell_up_key_binding in
+# ~/.config/atuin/config.toml). Cached (>15ms measured cost), same
+# invalidation as mise above.
 if (( $+commands[atuin] )); then
-  __zshrc_source_cached "$HOME/.zsh/cache/atuin_init.zsh" "$commands[atuin]" atuin init zsh --disable-up-arrow
+  __zshrc_source_cached "$HOME/.zsh/cache/atuin_init.zsh" "$commands[atuin]" atuin init zsh
 fi
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark atuin
 

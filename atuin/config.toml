@@ -1,0 +1,50 @@
+# atuin config — tracked in dotfiles, symlinked to ~/.config/atuin/config.toml.
+#
+# Recall model: Ctrl-R = global fuzzy search, up-arrow = directory-scoped
+# search ("what did I run *here*") — two genuinely different tools. Ctrl-S
+# cycles search mode and Ctrl-R cycles filter mode inside the TUI (built-in,
+# no config needed).
+#
+# MANUAL one-time task (deliberately not automated): importing old-machine
+# history. `atuin import zsh` has NO idempotent re-import (atuinsh/atuin#2904,
+# #2290) — re-running against overlapping history creates duplicate rows.
+# Locate the old ~/.zsh_history, copy it over, point HISTFILE at it, and run
+# `atuin import zsh` exactly once.
+
+search_mode = "fuzzy"
+filter_mode = "global"
+workspaces = true                             # enables the git-repo-scoped filter
+filter_mode_shell_up_key_binding = "directory"
+filters = ["global", "host", "workspace", "directory", "session"]
+
+# compact bounded popup, not fullscreen — less mode-switch feel
+style = "compact"
+inline_height = 12
+inline_height_shell_up_key_binding = 8
+
+enter_accept = true
+
+# secrets hygiene: keep the built-in scanner (AWS/GH/Slack/Stripe tokens) AND
+# a conservative history_filter closing the XSRF-token gap — commands matching
+# these are never written to the DB at all. Broad patterns like `-p\s+\S+` and
+# `.pem` are deliberately excluded (too many false positives).
+secrets_filter = true
+history_filter = [
+  "(?i)xsrf[-_]?token",
+  "(?i)csrf[-_]?token",
+  "(?i)authorization:\\s*bearer",
+  "--password[= ]",
+  "(?i)aws_secret_access_key",
+  "(?i)api[-_]?key\\s*=",
+]
+
+# sync: deliberately local-only for now. E2E encryption makes self-host vs
+# hosted a data-ownership choice, not a security one — revisit when mac +
+# SSH-box shared history is actually wanted.
+# [sync]
+# sync_address = ""
+# auto_sync = true
+
+[stats]
+common_prefix = ["sudo"]
+ignored_commands = ["cd", "ls", "vi", "clear"]
