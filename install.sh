@@ -93,7 +93,27 @@ mkdir -p ~/.config ~/.zsh
 backup_and_link "$DOTFILES_DIR/zsh/.zshrc"        "$HOME/.zshrc"
 backup_and_link "$DOTFILES_DIR/zsh/ai.zsh"        "$HOME/.zsh/ai.zsh"
 backup_and_link "$DOTFILES_DIR/zsh/zhelp.zsh"     "$HOME/.zsh/zhelp.zsh"
+backup_and_link "$DOTFILES_DIR/zsh/kube.zsh"      "$HOME/.zsh/kube.zsh"
 backup_and_link "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
+
+# --- 5. standalone homelab kubeconfig ---------------------------------------
+# kube.zsh points non-ExampleOrg shells at ~/.kube/homelab.yaml. Generate it
+# once from the merged ~/.kube/config if the homelab context is available.
+# --minify keeps only that context, so enterprise creds never leak into it.
+
+if [ ! -f "$HOME/.kube/homelab.yaml" ]; then
+  if command -v kubectl >/dev/null 2>&1 \
+     && kubectl config get-contexts admin@homelab >/dev/null 2>&1; then
+    log "generating standalone homelab kubeconfig: ~/.kube/homelab.yaml"
+    mkdir -p "$HOME/.kube"
+    kubectl config view --minify --flatten --context=admin@homelab > "$HOME/.kube/homelab.yaml"
+    chmod 600 "$HOME/.kube/homelab.yaml"
+  else
+    log "skipping ~/.kube/homelab.yaml (kubectl or admin@homelab context not available)"
+  fi
+else
+  log "~/.kube/homelab.yaml already exists"
+fi
 
 log "done. Start a new shell (or 'exec zsh') to pick everything up."
 log "If you need work-only settings (e.g. GOPRIVATE), copy zsh/work.zsh.example to ~/.zsh/work.zsh, edit it, and source it from a local (untracked) block in ~/.zshrc."

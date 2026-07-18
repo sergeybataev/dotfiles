@@ -274,6 +274,10 @@ fi
 [[ -f ~/.zsh/ai.zsh ]] && source ~/.zsh/ai.zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark ai.zsh
 
+# kube.zsh — per-directory KUBECONFIG binding (ExampleOrg ↔ homelab)
+[[ -f ~/.zsh/kube.zsh ]] && source ~/.zsh/kube.zsh
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark kube.zsh
+
 # zhelp.zsh — `zhelp`/`zh` cheat-sheet command for this setup
 [[ -f ~/.zsh/zhelp.zsh ]] && source ~/.zsh/zhelp.zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark zhelp

@@ -41,6 +41,8 @@ zhelp() {
     "  %F{white}diff%f                %F{8}aliased to difft (difftastic) — structural, syntax-aware diffing%f"
     "  %F{white}k%f                   %F{8}kubectl%f"
     "  %F{white}kerr%f                %F{8}list all pods across namespaces that are NOT Running%f"
+    "  %F{white}kubie ctx <ctx>%f     %F{8}explicit kube context switch in an isolated subshell (never edits ~/.kube/config)%f"
+    "  %F{white}auto KUBECONFIG%f     %F{8}cd into */ExampleOrg/* → ~/.kube/config (workctl creds); elsewhere → homelab kubeconfig%f"
     "  %F{white}zshv / zshs%f         %F{8}edit / reload ~/.zshrc%f"
     "  %F{white}tm%f                  %F{8}attach to (or create) a tmux session%f"
     "  %F{white}fixm%f                %F{8}reset terminal mouse-reporting after a dropped ssh session%f"
