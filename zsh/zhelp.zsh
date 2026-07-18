@@ -50,6 +50,8 @@ zhelp() {
     "  %F{white}tm%f                  %F{8}attach to (or create) a tmux session%f"
     "  %F{white}fixm%f                %F{8}reset terminal mouse-reporting after a dropped ssh session%f"
     "  %F{white}z / zi%f              %F{8}zoxide: jump to a frecent directory / interactive picker%f"
+    "  %F{white}ws%f                  %F{8}ghostty workspace launcher (fzf): work = 3 tabs × 2 panes at work-repo%f"
+    "  %F{white}ws homelab%f          %F{8}sub-menu: k8s-watchers / agents-2 / agents-4 / just-terminal (homelab dir)%f"
     ""
     "%B%F{cyan}Prompt segments legend%f%b"
     "  %F{white}⚙ <dirname>%f         %F{8}nearest ancestor dir with its own mise.toml/.mise.toml/.tool-versions%f"

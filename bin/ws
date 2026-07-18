@@ -1,0 +1,152 @@
+#!/usr/bin/env zsh
+# ws — ghostty workspace launcher.
+#
+# Ghostty has no native saved-layout/session restore (window-save-state keeps
+# structure, not contents), so a "workspace" is built fresh on demand through
+# ghostty 1.3+'s AppleScript API (new window / new tab / split, each with a
+# surface configuration carrying initial working directory + initial input).
+# Resume is deliberately nothing: fresh layout each launch.
+#
+# Usage:
+#   ws                       fzf picker (work / homelab -> sub-menu)
+#   ws work                  1 window, 3 tabs, each 2 vertical panes, work-repo
+#   ws homelab [layout]      k8s-watchers | agents-2 | agents-4 | just-terminal
+#   ws --dry-run <...>       print the AppleScript instead of running it
+#
+# Pane sizing is best-effort: ghostty splits ~equally and exact ratios are
+# not scriptable today.
+
+set -u
+
+WORK_DIR="$HOME/go/src/github.com/ExampleOrg/work-repo"
+HOMELAB_DIR="$HOME/go/src/github.com/sergeybataev/homelab"
+# every k8s-watchers pane enters the homelab context first (explicit launcher
+# step, independent of the cd-triggered KUBECONFIG binding in kube.zsh)
+KUBIE_LINE='kubie ctx admin@homelab'
+
+DRY_RUN=0
+
+_ws_osascript() {
+  if (( DRY_RUN )); then
+    print -r -- "$1"
+  else
+    osascript -e "$1" >/dev/null
+  fi
+}
+
+# --- work: 1 window, 3 tabs, each split into 2 vertical panes (6 surfaces) ---
+_ws_work() {
+  _ws_osascript "
+tell application \"Ghostty\"
+  activate
+  set cfg to new surface configuration
+  set initial working directory of cfg to \"$WORK_DIR\"
+  set w to new window with configuration cfg
+  split (focused terminal of selected tab of w) direction right with configuration cfg
+  set t2 to new tab in w with configuration cfg
+  split (focused terminal of t2) direction right with configuration cfg
+  set t3 to new tab in w with configuration cfg
+  split (focused terminal of t3) direction right with configuration cfg
+end tell"
+}
+
+# --- homelab layout A: k8s-watchers -----------------------------------------
+# two columns; left = node watch / kerr watch / agent shell, right = rook-ceph
+# pod watch / investigation shell. kerr is a zsh function, so the watcher runs
+# `watch zsh -ic kerr` (plain `watch kerr` would fail — watch execs via sh).
+_ws_homelab_watchers() {
+  _ws_osascript "
+tell application \"Ghostty\"
+  activate
+  set cfgNode to new surface configuration
+  set initial working directory of cfgNode to \"$HOMELAB_DIR\"
+  set initial input of cfgNode to \"$KUBIE_LINE\nwatch \\\"kubectl get node -o wide\\\"\n\"
+  set cfgKerr to new surface configuration
+  set initial working directory of cfgKerr to \"$HOMELAB_DIR\"
+  set initial input of cfgKerr to \"$KUBIE_LINE\nwatch zsh -ic kerr\n\"
+  set cfgRook to new surface configuration
+  set initial working directory of cfgRook to \"$HOMELAB_DIR\"
+  set initial input of cfgRook to \"$KUBIE_LINE\nkubectl get pods -n rook-ceph -w\n\"
+  set cfgShell to new surface configuration
+  set initial working directory of cfgShell to \"$HOMELAB_DIR\"
+  set initial input of cfgShell to \"$KUBIE_LINE\n\"
+  set w to new window with configuration cfgNode
+  set a to focused terminal of selected tab of w
+  set b to split a direction right with configuration cfgRook
+  set c to split a direction down with configuration cfgKerr
+  split c direction down with configuration cfgShell
+  split b direction down with configuration cfgShell
+end tell"
+}
+
+# --- homelab layouts B/C/D: plain ready shells, no kube auto-enter -----------
+_ws_homelab_panes() {
+  # $1 = 2 (two vertical panes) or 4 (2x2 grid)
+  local grid=""
+  if [[ "$1" == "4" ]]; then
+    grid="
+  split a direction down with configuration cfg
+  split b direction down with configuration cfg"
+  fi
+  _ws_osascript "
+tell application \"Ghostty\"
+  activate
+  set cfg to new surface configuration
+  set initial working directory of cfg to \"$HOMELAB_DIR\"
+  set w to new window with configuration cfg
+  set a to focused terminal of selected tab of w
+  set b to split a direction right with configuration cfg$grid
+end tell"
+}
+
+_ws_pick() {
+  # _ws_pick <prompt> <options...>
+  local prompt="$1"
+  shift
+  if (( $+commands[fzf] )); then
+    print -l -- "$@" | fzf --prompt="$prompt> " --height=~40% --reverse
+  else
+    print -u2 "ws: fzf not found — pass a choice explicitly (one of: $*)"
+    return 1
+  fi
+}
+
+main() {
+  if [[ "${1:-}" == "--dry-run" ]]; then
+    DRY_RUN=1
+    shift
+  fi
+
+  local choice="${1:-}"
+  if [[ -z "$choice" ]]; then
+    choice="$(_ws_pick workspace work homelab)" || return 1
+  fi
+
+  case "$choice" in
+    work)
+      _ws_work
+      ;;
+    homelab)
+      local layout="${2:-}"
+      if [[ -z "$layout" ]]; then
+        layout="$(_ws_pick homelab k8s-watchers agents-2 agents-4 just-terminal)" || return 1
+      fi
+      case "$layout" in
+        k8s-watchers)  _ws_homelab_watchers ;;
+        agents-2)      _ws_homelab_panes 2 ;;
+        agents-4)      _ws_homelab_panes 4 ;;
+        just-terminal) _ws_homelab_panes 2 ;;
+        *)
+          print -u2 "ws: unknown homelab layout '$layout'"
+          return 1
+          ;;
+      esac
+      ;;
+    *)
+      print -u2 "ws: unknown workspace '$choice' (work | homelab)"
+      return 1
+      ;;
+  esac
+}
+
+main "$@"
