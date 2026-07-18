@@ -54,12 +54,14 @@ Step-by-step for a fresh macOS/Linux box:
    ```
    It installs mise (if missing) and the pinned tool stack, clones the zsh plugins into `~/.zsh/plugins/`, symlinks the configs (`.zshrc`, `ai.zsh`, `zhelp.zsh`, `kube.zsh`, `bin/ws`, `starship.toml`, `atuin/config.toml`, `ghostty/config`+`theme.conf`) into place (backing up anything already there), links `git-hooks/` as the global `core.hooksPath`, and generates `~/.kube/homelab.yaml` if the `$HOMELAB_CTX` context is available.
 
-4. **Work values** — copy the example to the runtime path (the modules read `~/.zsh/work.zsh`, not the repo copy) and edit it:
+4. **Work values** — the modules read `~/.zsh/work.zsh` (the runtime path, not the repo copy). `install.sh` resolves it automatically: when the private overlay repo (`sergeybataev/dotfiles-private`) is reachable it clones/pulls it to `~/.dotfiles-private` and symlinks `zsh/work.zsh` → `~/.zsh/work.zsh` — so on a machine with overlay access there's **nothing to do here**.
+
+   The **fallback** (personal-only machine, or overlay not accessible): if no `~/.zsh/work.zsh` exists, `install.sh` seeds one from `zsh/work.zsh.example` and warns you to edit it. You can also do it by hand:
    ```sh
    cp zsh/work.zsh.example ~/.zsh/work.zsh   # ~/.zsh already exists after step 3
    $EDITOR ~/.zsh/work.zsh
    ```
-   Fill in `WORK_ORG`, `WORK_REPO`, `WORK_GH_USER`, `WORK_LABEL`, `HOMELAB`, `HOMELAB_CTX`, `WORK_GITCONFIG`, `GOPRIVATE`. For a **personal-only machine, skip this** — every work feature (AI claude-guard, work box, KUBECONFIG binding, gh/git work-identity) stays inert while `WORK_ORG` is unset, and personal trees keep working.
+   Fill in `WORK_ORG`, `WORK_REPO`, `WORK_GH_USER`, `WORK_LABEL`, `HOMELAB`, `HOMELAB_CTX`, `WORK_GITCONFIG`, `GOPRIVATE`. For a **personal-only machine, leave them blank** — every work feature (AI claude-guard, work box, KUBECONFIG binding, gh/git work-identity) stays inert while `WORK_ORG` is unset, and personal trees keep working. `install.sh` never overwrites an existing `~/.zsh/work.zsh`.
 
 5. **git identities** — the identity hooks read `~/.gitconfig-personal` (personal trees) and `$WORK_GITCONFIG` (defaults `~/.gitconfig-work`, work trees). Create whichever you use, each with a `[user] email`/`name`, or the guard will prompt/block on first commit in a matching tree.
 
