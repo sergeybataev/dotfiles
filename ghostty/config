@@ -1,0 +1,27 @@
+# ghostty base config — tracked in dotfiles, symlinked to ~/.config/ghostty/config
+# (the XDG path; install.sh backs up the Application Support copy so this is
+# the single source of truth). Theme/palette lives in theme.conf, included
+# below, so the theme can evolve without touching base settings.
+#
+# Deliberately mac-local: SSH boxes inherit the palette over the wire via
+# ANSI — there is nothing to install remotely.
+
+shell-integration-features = sudo
+
+keybind = global:ctrl+grave_accent=toggle_quick_terminal
+quick-terminal-screen = mouse
+quick-terminal-autohide = true
+
+background-opacity = 0.5
+background-blur = true
+macos-non-native-fullscreen = visible-menu
+fullscreen = true
+window-save-state = always
+
+auto-update = download
+auto-update-channel = tip
+window-colorspace = display-p3
+keybind = shift+enter=text:\x1b\r
+
+# 16-slot ANSI palette + background/foreground (resolved relative to this file)
+config-file = theme.conf

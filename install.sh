@@ -96,6 +96,19 @@ backup_and_link "$DOTFILES_DIR/zsh/zhelp.zsh"     "$HOME/.zsh/zhelp.zsh"
 backup_and_link "$DOTFILES_DIR/zsh/kube.zsh"      "$HOME/.zsh/kube.zsh"
 backup_and_link "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
 
+# ghostty: both files go to the XDG path so the bare `config-file = theme.conf`
+# relative include resolves next to the including file. The Application
+# Support copy is backed up away below — ghostty reads both locations and the
+# docs are ambiguous about which wins, so only one may exist.
+backup_and_link "$DOTFILES_DIR/ghostty/config"     "$HOME/.config/ghostty/config"
+backup_and_link "$DOTFILES_DIR/ghostty/theme.conf" "$HOME/.config/ghostty/theme.conf"
+
+GHOSTTY_APPSUPPORT="$HOME/Library/Application Support/com.mitchellh.ghostty/config"
+if [ -f "$GHOSTTY_APPSUPPORT" ] && [ ! -L "$GHOSTTY_APPSUPPORT" ]; then
+  log "backing up Application Support ghostty config -> ${GHOSTTY_APPSUPPORT}.backup.${TIMESTAMP}"
+  mv "$GHOSTTY_APPSUPPORT" "${GHOSTTY_APPSUPPORT}.backup.${TIMESTAMP}"
+fi
+
 # --- 5. global git identity-guard hooks --------------------------------------
 # pre-commit/pre-push assert the resolved user.email matches the tree
 # (ExampleOrg vs sergeybataev); unknown trees stop and ask for an explicit
