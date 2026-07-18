@@ -283,3 +283,80 @@ ai-fix-buffer() {
 
 zle -N ai-fix-buffer
 bindkey '^X^A' ai-fix-buffer
+
+# ---------------------------------------------------------------------------
+# 7. gh — directory-aware account switching + wrong-account write guard
+# ---------------------------------------------------------------------------
+# gh's active account is global per host, not per-directory. This wrapper
+# auto-runs `gh auth switch` to match the cwd's tree (announcing every flip so
+# it's never silent) and refuses write operations (pr create, etc.) when the
+# active account still doesn't match — belt-and-suspenders for the case where
+# the switch failed. Caveat: only interactive invocations are governed; a
+# background/agent gh call still mutates global state — the announce line is
+# what makes that observable.
+
+# _gh_expected_account: the gh account the cwd's tree expects, empty if the
+# cwd is outside both known trees (unknown trees are not governed).
+_gh_expected_account() {
+  case "$PWD" in
+    */ExampleOrg/*) print -n "work-gh-user" ;;
+    */sergeybataev/*) print -n "sergeybataev" ;;
+  esac
+}
+
+# _gh_active_account: currently-active gh account for github.com, read
+# locally from hosts.yml (no network round-trip on every gh call).
+_gh_active_account() {
+  awk '$1 == "user:" { print $2; exit }' "$HOME/.config/gh/hosts.yml" 2>/dev/null
+}
+
+# _gh_is_write_op <gh-args...> — 0 iff the invocation writes to GitHub.
+_gh_is_write_op() {
+  local cmd="" action="" a
+  for a in "$@"; do
+    [[ "$a" == -* ]] && continue
+    if [[ -z "$cmd" ]]; then
+      cmd="$a"
+      continue
+    fi
+    action="$a"
+    break
+  done
+  case "$cmd" in
+    pr|issue|repo|release|gist)
+      case "$action" in
+        list|view|status|diff|checks|download|clone) return 1 ;;
+        *) return 0 ;;
+      esac
+      ;;
+    api)
+      for a in "$@"; do
+        case "$a" in
+          -X|--method|-X*|--method=*|-f|-F|--field|--field=*|--raw-field|--input|--input=*) return 0 ;;
+        esac
+      done
+      return 1
+      ;;
+  esac
+  return 1
+}
+
+gh() {
+  local expected active
+  expected="$(_gh_expected_account)"
+  if [[ -n "$expected" ]]; then
+    active="$(_gh_active_account)"
+    if [[ -n "$active" && "$active" != "$expected" ]]; then
+      if command gh auth switch --hostname github.com --user "$expected" >/dev/null 2>&1; then
+        print -u2 "gh: switched active account $active → $expected (for ${PWD/#$HOME/~})"
+        active="$expected"
+      fi
+    fi
+    if [[ "$active" != "$expected" ]] && _gh_is_write_op "$@"; then
+      print -u2 "gh: BLOCKED write op — active account '$active' ≠ '$expected' expected for this tree"
+      print -u2 "gh: fix with: gh auth switch --user $expected"
+      return 1
+    fi
+  fi
+  command gh "$@"
+}

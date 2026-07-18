@@ -44,6 +44,8 @@ zhelp() {
     "  %F{white}kubie ctx <ctx>%f     %F{8}explicit kube context switch in an isolated subshell (never edits ~/.kube/config)%f"
     "  %F{white}kubectl guard%f       %F{8}delete/drain/cordon on any non-homelab context needs a hardware-key confirm — no bypass%f"
     "  %F{white}auto KUBECONFIG%f     %F{8}cd into */ExampleOrg/* → ~/.kube/config (workctl creds); elsewhere → homelab kubeconfig%f"
+    "  %F{white}gh (wrapped)%f        %F{8}auto-switches gh account per tree (announced); write ops blocked on wrong account%f"
+    "  %F{white}git identity guard%f  %F{8}pre-commit/pre-push block wrong user.email per tree; unknown repos prompt once%f"
     "  %F{white}zshv / zshs%f         %F{8}edit / reload ~/.zshrc%f"
     "  %F{white}tm%f                  %F{8}attach to (or create) a tmux session%f"
     "  %F{white}fixm%f                %F{8}reset terminal mouse-reporting after a dropped ssh session%f"

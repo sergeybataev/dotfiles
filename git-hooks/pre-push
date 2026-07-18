@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Global pre-push identity guard (installed via core.hooksPath) — backstop for
+# commits that slipped past pre-commit (made before the hooks existed, or
+# amended). Blocks the push when the resolved user.email is wrong for the
+# tree, or when any commit being pushed is authored/committed under a
+# different email than the tree expects.
+#
+# stdin: one "<local-ref> <local-sha> <remote-ref> <remote-sha>" line per ref.
+# Chains to the repo's own .git/hooks/pre-push at the end.
+
+set -u
+. "$(dirname "$0")/identity-lib.sh"
+
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+expected="$(idguard_expected_email "$top")"
+actual="$(git config user.email 2>/dev/null || true)"
+zero=0000000000000000000000000000000000000000
+
+refs="$(cat)"
+
+if [ -n "$expected" ]; then
+  if [ "$actual" != "$expected" ]; then
+    idguard_die "push blocked — user.email '$actual' does not match '$expected' expected for this tree" \
+      "repo: $top" \
+      "fix:  git config user.email '$expected'"
+  fi
+  while read -r _local_ref local_sha _remote_ref remote_sha; do
+    [ -z "${local_sha:-}" ] && continue
+    [ "$local_sha" = "$zero" ] && continue   # ref deletion, nothing pushed
+    if [ "$remote_sha" = "$zero" ]; then
+      range="$local_sha --not --remotes"     # new ref: everything not already remote
+    else
+      range="$remote_sha..$local_sha"
+    fi
+    # shellcheck disable=SC2086
+    bad="$(git log --format='%ae%n%ce' $range 2>/dev/null | sort -u | grep -Fxv "$expected" || true)"
+    if [ -n "$bad" ]; then
+      idguard_die "push blocked — commits in the range are authored/committed as:" \
+        $bad \
+        "expected: $expected" \
+        "fix authorship (e.g. git rebase --exec 'git commit --amend --reset-author --no-edit') before pushing"
+    fi
+  done <<EOF
+$refs
+EOF
+else
+  if ! git config --local user.email >/dev/null 2>&1; then
+    idguard_die "push blocked — repo outside ExampleOrg/sergeybataev trees, no local identity chosen" \
+      "repo: $top" \
+      "pick one explicitly with: git config user.email <email>"
+  fi
+fi
+
+repo_hook="$top/.git/hooks/pre-push"
+if [ -x "$repo_hook" ]; then
+  printf '%s\n' "$refs" | "$repo_hook" "$@"
+  exit $?
+fi
+exit 0

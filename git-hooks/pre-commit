@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+# Global pre-commit identity guard (installed via core.hooksPath).
+#
+#   ExampleOrg trees   -> user.email must be the ~/.gitconfig-work email
+#   sergeybataev trees  -> user.email must be the ~/.gitconfig-personal email
+#   anywhere else       -> no silent personal fallback: block until an
+#                          identity is consciously chosen (written once as a
+#                          local repo override, so it only prompts once).
+#
+# Chains to the repo's own .git/hooks/pre-commit at the end, since a global
+# core.hooksPath would otherwise shadow per-repo hooks.
+
+set -u
+. "$(dirname "$0")/identity-lib.sh"
+
+top="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+expected="$(idguard_expected_email "$top")"
+actual="$(git config user.email 2>/dev/null || true)"
+
+if [ -n "$expected" ]; then
+  if [ "$actual" != "$expected" ]; then
+    idguard_die "commit blocked — user.email '$actual' does not match '$expected' expected for this tree" \
+      "repo: $top" \
+      "fix:  git config user.email '$expected'   (or fix the includeIf stack in ~/.gitconfig)"
+  fi
+else
+  if ! git config --local user.email >/dev/null 2>&1; then
+    work_email="$(git config -f "$HOME/.gitconfig-work" user.email 2>/dev/null || true)"
+    personal_email="$(git config -f "$HOME/.gitconfig-personal" user.email 2>/dev/null || true)"
+    if [ -t 2 ] && { exec 9</dev/tty; } 2>/dev/null; then
+      {
+        echo "identity guard: this repo is outside the ExampleOrg/sergeybataev trees and has no local identity."
+        echo "  1) work     ($work_email)"
+        echo "  2) personal ($personal_email)"
+        echo "  3) other    (enter manually)"
+        printf 'pick an identity for this repo [1/2/3]: '
+      } >&2
+      read -r choice <&9
+      case "$choice" in
+        1)
+          git config user.email "$work_email"
+          git config user.name "$(git config -f "$HOME/.gitconfig-work" user.name)"
+          ;;
+        2)
+          git config user.email "$personal_email"
+          git config user.name "$(git config -f "$HOME/.gitconfig-personal" user.name)"
+          ;;
+        3)
+          printf 'email: ' >&2; read -r em <&9
+          printf 'name:  ' >&2; read -r nm <&9
+          git config user.email "$em"
+          git config user.name "$nm"
+          ;;
+        *)
+          idguard_die "no identity picked — commit aborted"
+          ;;
+      esac
+      echo "identity guard: written as a local override for this repo (git config --local user.email)" >&2
+    else
+      idguard_die "commit blocked — repo outside ExampleOrg/sergeybataev trees, no local identity chosen" \
+        "repo: $top" \
+        "pick one explicitly, e.g.: git config user.email '$personal_email'"
+    fi
+  fi
+fi
+
+repo_hook="$top/.git/hooks/pre-commit"
+[ -x "$repo_hook" ] && exec "$repo_hook" "$@"
+exit 0

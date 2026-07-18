@@ -96,7 +96,19 @@ backup_and_link "$DOTFILES_DIR/zsh/zhelp.zsh"     "$HOME/.zsh/zhelp.zsh"
 backup_and_link "$DOTFILES_DIR/zsh/kube.zsh"      "$HOME/.zsh/kube.zsh"
 backup_and_link "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
 
-# --- 5. standalone homelab kubeconfig ---------------------------------------
+# --- 5. global git identity-guard hooks --------------------------------------
+# pre-commit/pre-push assert the resolved user.email matches the tree
+# (ExampleOrg vs sergeybataev); unknown trees stop and ask for an explicit
+# identity. The hooks chain to each repo's own .git/hooks/* so nothing local
+# is shadowed by the global core.hooksPath.
+
+backup_and_link "$DOTFILES_DIR/git-hooks" "$HOME/.config/git/hooks"
+if command -v git >/dev/null 2>&1; then
+  git config --global core.hooksPath "$HOME/.config/git/hooks"
+  log "core.hooksPath -> ~/.config/git/hooks"
+fi
+
+# --- 6. standalone homelab kubeconfig ---------------------------------------
 # kube.zsh points non-ExampleOrg shells at ~/.kube/homelab.yaml. Generate it
 # once from the merged ~/.kube/config if the homelab context is available.
 # --minify keeps only that context, so enterprise creds never leak into it.
