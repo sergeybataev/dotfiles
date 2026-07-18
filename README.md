@@ -36,6 +36,37 @@ cp zsh/work.zsh.example ~/.zsh/work.zsh   # then edit the values
 
 One deliberately manual step: importing old-machine shell history into atuin. `atuin import zsh` has no idempotent re-import (duplicates on overlap), so locate the old `~/.zsh_history` and run the import exactly once — see the note at the top of `atuin/config.toml`.
 
+## New machine setup
+
+Step-by-step for a fresh macOS/Linux box:
+
+1. **SSH key** — make sure your personal SSH key is present and loaded (`ssh-add -l`) if you clone via the `github-personal` host alias. That alias is a `~/.ssh/config` `Host github-personal` entry pointing at `github.com` with your personal key; set it up first, or just clone over HTTPS instead.
+
+2. **Clone** (personal SSH alias, or HTTPS):
+   ```sh
+   git clone git@github-personal:sergeybataev/dotfiles.git ~/go/src/github.com/sergeybataev/dotfiles
+   # or: git clone https://github.com/sergeybataev/dotfiles.git
+   ```
+
+3. **Run the installer** (idempotent, safe to re-run):
+   ```sh
+   cd ~/go/src/github.com/sergeybataev/dotfiles && ./install.sh
+   ```
+   It installs mise (if missing) and the pinned tool stack, clones the zsh plugins into `~/.zsh/plugins/`, symlinks the configs (`.zshrc`, `ai.zsh`, `zhelp.zsh`, `kube.zsh`, `bin/ws`, `starship.toml`, `atuin/config.toml`, `ghostty/config`+`theme.conf`) into place (backing up anything already there), links `git-hooks/` as the global `core.hooksPath`, and generates `~/.kube/homelab.yaml` if the `$HOMELAB_CTX` context is available.
+
+4. **Work values** — copy the example to the runtime path (the modules read `~/.zsh/work.zsh`, not the repo copy) and edit it:
+   ```sh
+   cp zsh/work.zsh.example ~/.zsh/work.zsh   # ~/.zsh already exists after step 3
+   $EDITOR ~/.zsh/work.zsh
+   ```
+   Fill in `WORK_ORG`, `WORK_REPO`, `WORK_GH_USER`, `WORK_LABEL`, `HOMELAB`, `HOMELAB_CTX`, `WORK_GITCONFIG`, `GOPRIVATE`. For a **personal-only machine, skip this** — every work feature (AI claude-guard, work box, KUBECONFIG binding, gh/git work-identity) stays inert while `WORK_ORG` is unset, and personal trees keep working.
+
+5. **git identities** — the identity hooks read `~/.gitconfig-personal` (personal trees) and `$WORK_GITCONFIG` (defaults `~/.gitconfig-work`, work trees). Create whichever you use, each with a `[user] email`/`name`, or the guard will prompt/block on first commit in a matching tree.
+
+6. **gh accounts** — not auto-provisioned. Run `gh auth login` once per account you use (e.g. personal + work); the `ai.zsh` gh wrapper then auto-switches the active account by directory tree.
+
+7. **Reload**: `exec zsh`. First shell of the day rebuilds the completion cache once (slower); subsequent shells are fast.
+
 ## Keybinding cheat-sheet
 
 | Key | Action |
