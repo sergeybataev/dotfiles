@@ -57,3 +57,115 @@ _kube_chpwd() {
 autoload -Uz add-zsh-hook
 add-zsh-hook chpwd _kube_chpwd
 _kube_chpwd
+
+# ---------------------------------------------------------------------------
+# kubectl delete/drain/cordon guard
+# ---------------------------------------------------------------------------
+# A zsh function shadowing kubectl for interactive shells: destructive verbs
+# (delete / drain / cordon — deliberately NOT apply or scale) on any context
+# except homelab require a hardware-key confirmation, not y/N. There is no
+# bypass flag by design: this file is only sourced by interactive shells, so
+# scripts/CI calling kubectl directly never see the guard, and a guarded verb
+# inside an interactive shell can't run without a human present.
+
+# _kube_guard_needs_confirm <verb> <context> — 0 iff the verb is guarded on
+# this context. Homelab is the only carve-out (blanket non-homelab net; the
+# ☸ prompt tiers convey severity, the guard does not do name-pattern tiers).
+_kube_guard_needs_confirm() {
+  local verb="$1" ctx="$2"
+  case "$verb" in
+    delete|drain|cordon) ;;
+    *) return 1 ;;
+  esac
+  case "$ctx" in
+    *homelab*) return 1 ;;
+  esac
+  return 0
+}
+
+# _kube_guard_verb <args...> — echo the kubectl verb: the first argument that
+# is neither a flag nor the value of a value-taking global flag.
+_kube_guard_verb() {
+  local skip_next=0 arg
+  for arg in "$@"; do
+    if (( skip_next )); then
+      skip_next=0
+      continue
+    fi
+    case "$arg" in
+      --context|--namespace|--kubeconfig|--cluster|--user|--server|-n|-s)
+        skip_next=1
+        ;;
+      -*)
+        ;;
+      *)
+        print -r -- "$arg"
+        return 0
+        ;;
+    esac
+  done
+  return 1
+}
+
+# _kube_guard_context <args...> — echo the effective context: an explicit
+# --context flag wins, otherwise the current-context of the active KUBECONFIG.
+_kube_guard_context() {
+  local prev="" arg
+  for arg in "$@"; do
+    case "$arg" in
+      --context=*)
+        print -r -- "${arg#--context=}"
+        return 0
+        ;;
+    esac
+    if [[ "$prev" == "--context" ]]; then
+      print -r -- "$arg"
+      return 0
+    fi
+    prev="$arg"
+  done
+  command kubectl config current-context 2>/dev/null
+}
+
+# _kube_guard_confirm <context> — the human-presence gate for a guarded verb.
+# Requires the YubiKey to be physically plugged in (gpg --card-status talks to
+# the card and fails without it), then requires typing the exact context name.
+# Deliberately NOT y/N, and deliberately no bypass flag/env var.
+#
+# TODO(yubikey-enroll): the YubiKey's OpenPGP applet has no keys enrolled yet
+# (gpg --card-status shows all three slots [none]). Once a signing key is
+# generated on-card (`gpg --card-edit` → admin → generate, then set
+# touch-policy to on via `ykman openpgp keys set-touch sig on`), replace the
+# typed-context step below with a real touch-verified signature:
+#   print -r -- "$nonce" | gpg --sign --local-user <card-key-id> >/dev/null
+# which forces PIN entry + physical touch per invocation.
+_kube_guard_confirm() {
+  if ! command gpg --card-status >/dev/null 2>&1; then
+    print -u2 "kubectl guard: hardware key not detected — plug in the YubiKey to run guarded verbs"
+    return 1
+  fi
+  local typed
+  print -u2 -n "kubectl guard: hardware key present. Type the context name ($1) to confirm: "
+  read -r typed
+  [[ "$typed" == "$1" ]]
+}
+
+kubectl() {
+  local verb ctx
+  verb="$(_kube_guard_verb "$@")"
+  if [[ -n "$verb" ]]; then
+    ctx="$(_kube_guard_context "$@")"
+    if _kube_guard_needs_confirm "$verb" "$ctx"; then
+      print -u2 "kubectl guard: '$verb' on a non-homelab context"
+      print -u2 "  context:    ${ctx:-<none>}"
+      print -u2 "  kubeconfig: ${KUBECONFIG:-$HOME/.kube/config}"
+      print -u2 "  namespace:  $(command kubectl config view --minify -o jsonpath='{..namespace}' 2>/dev/null || print -n default)"
+      print -u2 "  command:    kubectl $*"
+      if ! _kube_guard_confirm "$ctx"; then
+        print -u2 "kubectl guard: refused."
+        return 1
+      fi
+    fi
+  fi
+  command kubectl "$@"
+}
