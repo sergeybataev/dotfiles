@@ -145,6 +145,7 @@ alias zshs="source ~/.zshrc"
 
 ### ssh
 # alias server="ssh fileserver -t tmux attach"
+alias herdr-sandbox="herdr --remote agentic-sandbox"
 
 #### tmux
 alias tm="tmux ls 2>/dev/null | awk 'END{if(NR==1) print $1}' | sed 's/://g' | read -r tmux_session && tmux attach -t \"$tmux_session\" || (tmux ls || tmux new -s default; echo -n \"Enter session name: \"; read tmux_session; tmux attach -t \"$tmux_session\" 2>/dev/null || tmux new -s \"$tmux_session\")"
