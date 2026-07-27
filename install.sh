@@ -10,7 +10,7 @@
 #   4. Symlinks the shell configs into place (timestamped backup of anything
 #      already there). Fully symlinked: zhelp.zsh / kube.zsh / bin/ws /
 #      atuin / ghostty. Deferred (linked only if absent — see ticket 13):
-#      .zshrc / ai.zsh / starship.toml.
+#      ai.zsh / starship.toml.
 #   5. Resolves private work values via the dotfiles-private overlay repo,
 #      symlinking its zsh/work.zsh -> ~/.zsh/work.zsh (falls back to the
 #      example template when the overlay is unavailable).
@@ -93,8 +93,7 @@ fi
 # --- 2. tools from mise/config.toml -----------------------------------------
 
 log "installing tools pinned in mise/config.toml"
-mkdir -p ~/.config/mise
-cp -n "$DOTFILES_DIR/mise/config.toml" ~/.config/mise/config.toml 2>/dev/null || true
+backup_and_link "$DOTFILES_DIR/mise/config.toml" "$HOME/.config/mise/config.toml"
 (cd ~/.config/mise && mise install)
 mise use -g -y 2>/dev/null || true
 
@@ -122,11 +121,10 @@ clone_plugin zsh-history-substring-search https://github.com/zsh-users/zsh-histo
 
 mkdir -p ~/.config ~/.zsh
 
-# Deferred conversions (ticket 13): these three are the all-symlink target, but
-# existing local copies may still hold un-migrated machine-specific content, so
-# link them only on a fresh machine and never clobber an existing copy. Convert
-# them for real once their private bits live in ~/.zsh/work.zsh.
-link_if_absent  "$DOTFILES_DIR/zsh/.zshrc"        "$HOME/.zshrc"
+# .zshrc is fully managed now that private work values live in
+# ~/.zsh/work.zsh. Keep ai.zsh and starship.toml deferred until their remaining
+# machine-specific differences are migrated.
+backup_and_link "$DOTFILES_DIR/zsh/.zshrc"        "$HOME/.zshrc"
 link_if_absent  "$DOTFILES_DIR/zsh/ai.zsh"        "$HOME/.zsh/ai.zsh"
 link_if_absent  "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
 
