@@ -211,6 +211,23 @@ fi
 __zshrc_source_cached "$HOME/.zsh/cache/mise_activate.zsh" "$commands[mise]" mise activate zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "mise activate"
 
+# Keep npm-installed global CLIs (for example Codex) discoverable when mise
+# selects a different Node version per project. npm reports the active global
+# prefix, so this avoids hard-coding a versioned Node installation path.
+if (( $+commands[npm] )); then
+  export PATH="$(npm prefix -g)/bin:$PATH"
+fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "npm global bin"
+
+# Linux containers use the shared SSH agent socket mounted at /history.
+if [[ "$OSTYPE" == linux* ]]; then
+  export SSH_AUTH_SOCK=/history/.ssh-agent/agent.sock
+
+  memorykey() {
+    ssh-add "$HOME/.ssh/id_ed25519"
+  }
+fi
+
 # direnv hook (only if installed)
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "direnv hook"
