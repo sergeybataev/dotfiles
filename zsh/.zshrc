@@ -147,6 +147,18 @@ alias zshs="source ~/.zshrc"
 # alias server="ssh fileserver -t tmux attach"
 alias herdr-sandbox="herdr --remote agentic-sandbox"
 
+#### herdmates: inside a herdr pane, `claude` becomes the agent-team lead
+#### (teammux-launch shims tmux via herdr panes); use `command claude` to
+#### bypass. ai.zsh's internal one-shot calls already use `command claude`
+#### so `ai`/`aix`/`wtf` never get rerouted through this.
+claude() {
+  if [[ -n "$HERDR_PANE_ID" ]] && command -v herdmates >/dev/null 2>&1; then
+    herdmates teammux-launch "$@"
+  else
+    command claude "$@"
+  fi
+}
+
 #### tmux
 alias tm="tmux ls 2>/dev/null | awk 'END{if(NR==1) print $1}' | sed 's/://g' | read -r tmux_session && tmux attach -t \"$tmux_session\" || (tmux ls || tmux new -s default; echo -n \"Enter session name: \"; read tmux_session; tmux attach -t \"$tmux_session\" 2>/dev/null || tmux new -s \"$tmux_session\")"
 
