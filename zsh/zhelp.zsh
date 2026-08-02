@@ -53,6 +53,7 @@ zhelp() {
     "  %F{white}git identity guard%f  %F{8}pre-commit/pre-push block wrong user.email per tree; unknown repos prompt once%f"
     "  %F{white}zshv / zshs%f         %F{8}edit / reload ~/.zshrc%f"
     "  %F{white}herdr-sandbox%f        %F{8}attach to the persistent Herdr session on agentic-sandbox%f"
+    "  %F{white}herdmates teammux-launch%f %F{8}start Claude Code as an agent-team lead in herdr panes (add --split for a new pane; no claude() wrapper by design)%f"
     "  %F{white}tm%f                  %F{8}attach to (or create) a tmux session%f"
     "  %F{white}fixm%f                %F{8}reset terminal mouse-reporting after a dropped ssh session%f"
     "  %F{white}z / zi%f              %F{8}zoxide: jump to a frecent directory / interactive picker%f"

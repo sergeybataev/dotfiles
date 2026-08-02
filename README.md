@@ -111,6 +111,21 @@ Run `zhelp` (or `zh`) for a compact, colorized cheat sheet covering keybindings,
 
 `ws` is an fzf picker that builds ghostty layouts on demand via the AppleScript API (ghostty 1.3+; there's no native session save/restore, so layouts are recreated fresh each launch): **work** = 1 window, 3 tabs × 2 vertical panes at the `$WORK_ORG/$WORK_REPO` root; **homelab** = a sub-menu of `k8s-watchers` (node/kerr/rook-ceph watchers + agent + investigation panes, each auto-entering `kubie ctx $HOMELAB_CTX`), `agents-2`, `agents-4`, and `just-terminal`, all at the homelab root. Pane sizing is best-effort (ghostty splits ~equally).
 
+## Agent teams in herdr (herdmates)
+
+[herdmates](https://github.com/caioniehues/herdmates) makes Claude Code's agent-team mode run as real herdr panes instead of tmux panes. Installed through herdr's own plugin system, not from this repo:
+
+```sh
+herdr plugin install caioniehues/herdmates
+```
+
+The plugin's build hook runs `cargo install --path . --root "$HOME/.local"`, which is why `rust = "latest"` is pinned in `mise/config.toml` — without a toolchain on `$PATH` the install hook fails, and a plain `cargo build` wouldn't put a bare `herdmates` on `$PATH` where herdr resolves manifest commands. The binary lands in `~/.local/bin/herdmates`, next to `herdr` itself.
+
+It needs `"teamMode": "tmux"` in `~/.claude/settings.json` (untracked here). `herdmates teammux-launch` then fakes a `tmux` executable plus a `TMUX` env var for that Claude process and translates the tmux calls into herdr pane operations.
+
+- Launch the team lead explicitly from inside a herdr pane: `herdmates teammux-launch [claude args…]` (takes over the current pane), or `--split` to put the lead in a new pane. `--resume` passes straight through.
+- **Deliberately no `claude()` shell wrapper.** The upstream README suggests shadowing `claude` with a function that redirects to `herdmates teammux-launch` whenever `$HERDR_PANE_ID` is set. Skipped on purpose: nearly every `claude` invocation here happens inside a herdr pane, so the wrapper would silently reroute *all* of them through a shim, and `ai.zsh` already wraps/routes `claude`. Opting in per launch keeps plain `claude` meaning plain `claude`.
+
 ## Theme (ghostty)
 
 `ghostty/config` (base settings) + `ghostty/theme.conf` (16-slot ANSI palette on a deep blue-black `#0e1420` ground, accents brightened to survive the 0.5-opacity translucent background) are symlinked to `~/.config/ghostty/`. starship/fzf/bat reference ANSI slot names and inherit the palette for free; SSH boxes inherit it over the wire, so nothing is installed remotely.
