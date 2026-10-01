@@ -145,6 +145,19 @@ alias zshs="source ~/.zshrc"
 
 ### ssh
 # alias server="ssh fileserver -t tmux attach"
+alias herdr-sandbox="herdr --remote agentic-sandbox"
+
+#### herdmates: inside a herdr pane, `claude` becomes the agent-team lead
+#### (teammux-launch shims tmux via herdr panes); use `command claude` to
+#### bypass. ai.zsh's internal one-shot calls already use `command claude`
+#### so `ai`/`aix`/`wtf` never get rerouted through this.
+claude() {
+  if [[ -n "$HERDR_PANE_ID" ]] && command -v herdmates >/dev/null 2>&1; then
+    herdmates teammux-launch "$@"
+  else
+    command claude "$@"
+  fi
+}
 
 #### tmux
 alias tm="tmux ls 2>/dev/null | awk 'END{if(NR==1) print $1}' | sed 's/://g' | read -r tmux_session && tmux attach -t \"$tmux_session\" || (tmux ls || tmux new -s default; echo -n \"Enter session name: \"; read tmux_session; tmux attach -t \"$tmux_session\" 2>/dev/null || tmux new -s \"$tmux_session\")"
@@ -209,6 +222,23 @@ fi
 # regenerated when the mise binary is upgraded or the cache is >24h old.
 __zshrc_source_cached "$HOME/.zsh/cache/mise_activate.zsh" "$commands[mise]" mise activate zsh
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "mise activate"
+
+# Keep npm-installed global CLIs (for example Codex) discoverable when mise
+# selects a different Node version per project. npm reports the active global
+# prefix, so this avoids hard-coding a versioned Node installation path.
+if (( $+commands[npm] )); then
+  export PATH="$(npm prefix -g)/bin:$PATH"
+fi
+[[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "npm global bin"
+
+# Linux containers use the shared SSH agent socket mounted at /history.
+if [[ "$OSTYPE" == linux* ]]; then
+  export SSH_AUTH_SOCK=/history/.ssh-agent/agent.sock
+
+  memorykey() {
+    ssh-add "$HOME/.ssh/id_ed25519"
+  }
+fi
 
 # direnv hook (only if installed)
 (( $+commands[direnv] )) && eval "$(direnv hook zsh)"

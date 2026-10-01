@@ -123,7 +123,7 @@ ai() {
   local assistant="$(_ai_assistant)"
   case "$assistant" in
     claude)
-      claude -p "$*"
+      command claude -p "$*"
       ;;
     codex)
       codex exec "$*"
@@ -154,7 +154,7 @@ aix() {
   local prompt="Output ONLY a shell command that accomplishes the following task. No prose, no explanation, no markdown code fences — just the raw command on its own line: $*"
   case "$assistant" in
     claude)
-      claude -p "$prompt"
+      command claude -p "$prompt"
       ;;
     codex)
       codex exec "$prompt"
@@ -230,7 +230,7 @@ wtf() {
 
   case "$assistant" in
     claude)
-      claude -p "$prompt"
+      command claude -p "$prompt"
       ;;
     codex)
       codex exec "$prompt"
@@ -267,7 +267,7 @@ ai-fix-buffer() {
   local result
   case "$assistant" in
     claude)
-      result="$(claude -p "$prompt" 2>/dev/null)"
+      result="$(command claude -p "$prompt" 2>/dev/null)"
       ;;
     codex)
       result="$(codex exec "$prompt" 2>/dev/null)"
