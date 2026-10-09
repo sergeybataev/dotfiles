@@ -2,6 +2,9 @@
 zmodload zsh/datetime
 zmodload zsh/stat
 typeset -F __zshrc_start=$EPOCHREALTIME
+export ZSHRC_DEBUG=1
+# timings table is printed only when startup takes at least this long (0 = always)
+: ${ZSHRC_DEBUG_MIN_MS:=500}
 
 # __zshrc_stale <file> <max_age_hours> — true (0) if <file> is missing or its
 # mtime is older than <max_age_hours>. Used to gate the once-a-day compinit
@@ -224,10 +227,10 @@ __zshrc_source_cached "$HOME/.zsh/cache/mise_activate.zsh" "$commands[mise]" mis
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "mise activate"
 
 # Keep npm-installed global CLIs (for example Codex) discoverable when mise
-# selects a different Node version per project. npm reports the active global
-# prefix, so this avoids hard-coding a versioned Node installation path.
+# selects a different Node version per project. Uses npm's own bin/ dir, taken
+# from its path: `npm prefix -g` starts Node (130-300ms) on every shell.
 if (( $+commands[npm] )); then
-  export PATH="$(npm prefix -g)/bin:$PATH"
+  export PATH="${commands[npm]:h}:$PATH"
 fi
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark "npm global bin"
 
@@ -351,7 +354,7 @@ fi
 # fzf shell integration (completion + Ctrl-T/Alt-C widgets only —
 # atuin takes ownership of Ctrl-R since it's initialized after this)
 if (( $+commands[fzf] )); then
-  source <(fzf --zsh)
+  __zshrc_source_cached "$HOME/.zsh/cache/fzf_init.zsh" "$commands[fzf]" fzf --zsh
 fi
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark fzf
 
@@ -366,7 +369,7 @@ fi
 
 # zoxide
 if (( $+commands[zoxide] )); then
-  eval "$(zoxide init zsh)"
+  __zshrc_source_cached "$HOME/.zsh/cache/zoxide_init.zsh" "$commands[zoxide]" zoxide init zsh
 fi
 [[ -n "$ZSHRC_DEBUG" ]] && __zshrc_mark zoxide
 
@@ -434,7 +437,7 @@ __zshrc_report_startup() {
   local -F elapsed=$(( EPOCHREALTIME - __zshrc_start ))
   printf '⚡ zsh ready in %.0f ms\n' $(( elapsed * 1000 ))
 
-  if [[ -n "$ZSHRC_DEBUG" ]]; then
+  if [[ -n "$ZSHRC_DEBUG" ]] && (( elapsed * 1000 >= ZSHRC_DEBUG_MIN_MS )); then
     echo "--- ZSHRC_DEBUG: per-section timings (sorted, slowest first) ---"
     local name
     for name in "${__zshrc_mark_order[@]}"; do
