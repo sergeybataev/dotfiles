@@ -9,6 +9,7 @@
 shell-integration-features = sudo
 
 keybind = global:ctrl+grave_accent=toggle_quick_terminal
+
 quick-terminal-screen = mouse
 quick-terminal-autohide = true
 
@@ -21,7 +22,9 @@ window-save-state = always
 auto-update = download
 auto-update-channel = tip
 window-colorspace = display-p3
-keybind = shift+enter=text:\x1b\r
+
+keybind = shift+enter=csi:13;2u
+keybind = alt+up=csi:1;3A
 
 # 16-slot ANSI palette + background/foreground (resolved relative to this file)
 config-file = theme.conf
