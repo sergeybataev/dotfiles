@@ -1,3 +1,4 @@
 .DS_Store
 .omc/
 zsh/work.zsh
+zsh/.zcompdump*
