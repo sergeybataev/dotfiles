@@ -17,3 +17,13 @@ bun = "latest"
 rust = "latest"
 boundary = "0.21"
 vault = "2.1.1"
+"npm:openwiki" = "0.6.1"
+shellcheck = "latest"
+
+[env]
+# openwiki: no telemetry, no LangSmith tracing
+OPENWIKI_TELEMETRY_DISABLED = "1"
+DO_NOT_TRACK = "1"
+LANGCHAIN_TRACING_V2 = "false"
+LANGCHAIN_TRACING = "false"
+LANGSMITH_TRACING = "false"
